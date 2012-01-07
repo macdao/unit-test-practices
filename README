@@ -1,0 +1,2 @@
+* Java package names are all low case
+* Remove final from MyDriver because of Mockito need to mock it
