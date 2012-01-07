@@ -16,7 +16,7 @@ public class MyConnection {
     }
 
     public void open() {
-        executorService.submit(new MyConnectionOpener(uris));
+        executorService.submit(new MyConnectionOpener(uris, RECONNECT_INTERVAL));
     }
 
     public void close() {

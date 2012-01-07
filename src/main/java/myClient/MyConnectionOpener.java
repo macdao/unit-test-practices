@@ -14,11 +14,14 @@ import org.slf4j.LoggerFactory;
  */
 public class MyConnectionOpener implements Runnable {
     private String[] uris;
+    private int reconnectInterval;
     private MyDriverFactory myDriverFactory;
+    private CommonUtility commonUtility;
     private Logger logger = LoggerFactory.getLogger(getClass());
 
-    public MyConnectionOpener(String[] uris) {
+    public MyConnectionOpener(String[] uris, int reconnectInterval) {
         this.uris = uris;
+        this.reconnectInterval = reconnectInterval;
     }
 
     @Override
@@ -37,7 +40,7 @@ public class MyConnectionOpener implements Runnable {
             } catch (MyDriverException e) {
                 logger.warn("Failed to connect to uri {} and got '{}'", uri, e.getMessage());
             }
-            //ReconnectInterval sleep
+            commonUtility.threadSleep(reconnectInterval);
         }
     }
 
@@ -47,5 +50,9 @@ public class MyConnectionOpener implements Runnable {
 
     public void setMyDriverFactory(MyDriverFactory myDriverFactory) {
         this.myDriverFactory = myDriverFactory;
+    }
+
+    public void setCommonUtility(CommonUtility commonUtility) {
+        this.commonUtility = commonUtility;
     }
 }

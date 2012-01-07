@@ -8,6 +8,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
+import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,15 +36,19 @@ public class MyConnectionOpenerTest {
     MyDriver myDriver2;
     @Mock
     MyDriver myDriver3;
-    
+    @Mock CommonUtility commonUtility;
+    private int reconnectInterval;
+
     @Before
     public void setUp() throws Exception {
         uri1 = "a";
         uri2 = "b";
         uri3 = "c";
         uris = new String[]{uri1, uri2, uri3};
-        myConnectionOpener = new MyConnectionOpener(uris);
+        reconnectInterval = 100;
+        myConnectionOpener = new MyConnectionOpener(uris, reconnectInterval);
         myConnectionOpener.setMyDriverFactory(myDriverFactory);
+        myConnectionOpener.setCommonUtility(commonUtility);
     }
 
     @Test
@@ -65,5 +70,6 @@ public class MyConnectionOpenerTest {
 
         verify(myDriver1).connect();
         verify(myDriver2).connect();
+        verify(commonUtility).threadSleep(reconnectInterval);
     }
 }
