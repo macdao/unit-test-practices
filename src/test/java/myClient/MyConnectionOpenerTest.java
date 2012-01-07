@@ -2,13 +2,17 @@ package myClient;
 
 import myDriver.MyDriver;
 import myDriver.MyDriverException;
+import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import static org.mockito.Matchers.contains;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +32,7 @@ public class MyConnectionOpenerTest {
     private String uri1;
     private String uri2;
     private String uri3;
+    private AtomicReference<MyDriver> myDriverReference;
     @Mock
     MyDriverFactory myDriverFactory;
     @Mock
@@ -46,7 +51,9 @@ public class MyConnectionOpenerTest {
         uri3 = "c";
         uris = new String[]{uri1, uri2, uri3};
         reconnectInterval = 100;
-        myConnectionOpener = new MyConnectionOpener(uris, reconnectInterval);
+        myDriverReference = new AtomicReference<MyDriver>();
+
+        myConnectionOpener = new MyConnectionOpener(uris, reconnectInterval, myDriverReference);
         myConnectionOpener.setMyDriverFactory(myDriverFactory);
         myConnectionOpener.setCommonUtility(commonUtility);
     }
@@ -58,6 +65,7 @@ public class MyConnectionOpenerTest {
         myConnectionOpener.run();
 
         verify(myDriver1).connect();
+        assertThat(myConnectionOpener.getMyDriverReference().get(), is(myDriver1));
     }
 
     @Test
@@ -71,5 +79,6 @@ public class MyConnectionOpenerTest {
         verify(myDriver1).connect();
         verify(myDriver2).connect();
         verify(commonUtility).threadSleep(reconnectInterval);
+        assertThat(myConnectionOpener.getMyDriverReference().get(), is(myDriver2));
     }
 }

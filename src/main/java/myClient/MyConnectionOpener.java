@@ -5,6 +5,8 @@ import myDriver.MyDriverException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
  * Created by IntelliJ IDEA.
  * User: Macdao
@@ -15,13 +17,15 @@ import org.slf4j.LoggerFactory;
 public class MyConnectionOpener implements Runnable {
     private String[] uris;
     private int reconnectInterval;
+    private AtomicReference<MyDriver> myDriverReference;
     private MyDriverFactory myDriverFactory;
     private CommonUtility commonUtility;
     private Logger logger = LoggerFactory.getLogger(getClass());
 
-    public MyConnectionOpener(String[] uris, int reconnectInterval) {
+    public MyConnectionOpener(String[] uris, int reconnectInterval, AtomicReference<MyDriver> myDriverReference) {
         this.uris = uris;
         this.reconnectInterval = reconnectInterval;
+        this.myDriverReference = myDriverReference;
     }
 
     @Override
@@ -36,6 +40,7 @@ public class MyConnectionOpener implements Runnable {
             MyDriver myDriver = myDriverFactory.newMyDriver(uri);
             try {
                 myDriver.connect();
+                myDriverReference.set(myDriver);
                 break;
             } catch (MyDriverException e) {
                 logger.warn("Failed to connect to uri {} and got '{}'", uri, e.getMessage());
@@ -46,6 +51,14 @@ public class MyConnectionOpener implements Runnable {
 
     public String[] getUris() {
         return uris;
+    }
+
+    public int getReconnectInterval() {
+        return reconnectInterval;
+    }
+
+    public AtomicReference<MyDriver> getMyDriverReference() {
+        return myDriverReference;
     }
 
     public void setMyDriverFactory(MyDriverFactory myDriverFactory) {
