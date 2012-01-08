@@ -12,9 +12,8 @@ import java.io.Closeable;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
 public class MyConnectionTest {
@@ -31,13 +30,16 @@ public class MyConnectionTest {
     @Mock
     MyConnectionOpener myConnectionOpener;
     @Mock
-    Thread thread;
+    Thread receiverThread;
+    @Mock
+    Thread openerThread;
     @Mock
     ThreadFactory threadFactory;
     @Mock
     MyConnectionOpenerFactory myConnectionOpenerFactory;
     @Mock
     MyConnectionReceiverFactory myConnectionReceiverFactory;
+    private int queryId;
 
 
     @Before
@@ -45,15 +47,12 @@ public class MyConnectionTest {
         myDriverReference = new AtomicReference<MyDriverAdapter>();
         uris = new String[]{};
         when(myConnectionOpenerFactory.newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, myDriverReference)).thenReturn(myConnectionOpener);
-
-        myConnection = new MyConnection(uris, myConnectionOpenerFactory, myDriverReference);
-
-        myConnection.setThreadFactory(threadFactory);
-        when(threadFactory.newThread(any(Runnable.class))).thenReturn(thread);
-
-
-        myConnection.setMyConnectionReceiverFactory(myConnectionReceiverFactory);
+        when(threadFactory.newThread(myConnectionOpener)).thenReturn(openerThread);
+        when(threadFactory.newThread(myConnectionReceiver)).thenReturn(receiverThread);
         when(myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener)).thenReturn(myConnectionReceiver);
+
+        myConnection = new MyConnection(uris, myConnectionOpenerFactory, myDriverReference, myConnectionReceiverFactory, threadFactory);
+        queryId = 123;
     }
 
     @Test
@@ -62,16 +61,15 @@ public class MyConnectionTest {
 
         verify(myConnectionOpenerFactory).newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, myDriverReference);
         verify(threadFactory).newThread(myConnectionOpener);
-        verify(thread).start();
+        verify(openerThread).start();
     }
 
     @Test
     public void testSubscribe() throws Exception {
-        int queryId = 123;
         Closeable closeable = myConnection.subscribe(queryId, mySubscriber);
 
         verify(threadFactory).newThread(myConnectionReceiver);
-        verify(thread).start();
+        verify(receiverThread).start();
         verify(myConnectionReceiverFactory).newMyConnectionReceiver(myDriverReference, myConnectionOpener);
         verify(myConnectionReceiver).addSubscriber(queryId, mySubscriber);
 
@@ -80,9 +78,23 @@ public class MyConnectionTest {
         verify(myConnectionReceiver).removeSubscriber(queryId);
     }
 
+    /**
+     * 断开与服务器的连接（即调用MyDriver的Close方法）。
+     * 该方法“不需要”清除所有订阅，换言之可以再次Open，每个已注册的subscriber会重新开始接受数据。
+     *
+     * @throws Exception e
+     */
     @Test
     public void testClose() throws Exception {
+        MyDriverAdapter myDriverAdapter = mock(MyDriverAdapter.class);
+        myDriverReference.set(myDriverAdapter);
+        myConnection.subscribe(queryId, mySubscriber);
 
+        myConnection.close();
+
+        verify(myDriverAdapter).close();
+        myConnection.subscribe(queryId, mySubscriber);
+        verify(myConnectionReceiver,times(2)).addSubscriber(queryId,mySubscriber);
     }
 
     @Test

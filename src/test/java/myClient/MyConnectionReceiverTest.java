@@ -62,8 +62,30 @@ public class MyConnectionReceiverTest {
         verifyNoMoreInteractions(mySubscriber);
     }
 
+    /**
+     * 增加订阅者会向MyDriver发送消息
+     *
+     * @throws Exception e
+     */
     @Test
-    public void testRunAddQuery() throws Exception {
+    public void testRunAndAddQuery() throws Exception {
+        String message = "else";
+        when(myDriver.receive()).thenReturn(new MyData(queryId, "begin"), new MyData(queryId, message), null);
+        myConnectionReceiver.addSubscriber(queryId, mySubscriber);
+
+        new Thread(myConnectionReceiver).start();
+        myDriverReference.set(myDriver);
+        Thread.sleep(100);
+
+        verify(myDriver).addQuery(queryId);
+        verify(mySubscriber).onBegin();
+        verify(mySubscriber).onMessage(message);
+
+        verifyNoMoreInteractions(mySubscriber);
+    }
+
+    @Test
+    public void testRunAndAddQueryThrowException() throws Exception {
         myDriverReference.set(myDriver);
         doThrow(new MyDriverException("Error occurred when add query.")).when(myDriver).addQuery(queryId);
         myConnectionReceiver.setQueryIdAdded(true);
@@ -81,32 +103,15 @@ public class MyConnectionReceiverTest {
         verifyNoMoreInteractions(myDriver);
     }
 
-    @Test
-    public void testRun3() throws Exception {
-        String message = "else";
-        when(myDriver.receive()).thenReturn(new MyData(queryId, "begin"), new MyData(queryId, message), null);
-        myConnectionReceiver.addSubscriber(queryId, mySubscriber);
-
-        new Thread(myConnectionReceiver).start();
-        myDriverReference.set(myDriver);
-        Thread.sleep(100);
-
-        verify(myDriver).addQuery(queryId);
-        verify(mySubscriber).onBegin();
-        verify(mySubscriber).onMessage(message);
-
-        verifyNoMoreInteractions(mySubscriber);
-    }
-
     /**
-     * 如果抛出了MyDriverException异常，则关闭当前的MyDriver对象，
+     * receive 如果抛出了MyDriverException异常，则关闭当前的MyDriver对象，
      * 并“立即”重新开始连接下一个uri，如果失败，则再尝试下一个（此时需要有一定间隔），
      * 连接成功后重新向各subscriber发送数据。
      *
      * @throws Exception e
      */
     @Test
-    public void testRun2() throws Exception {
+    public void testRunAndReceiveThrowException() throws Exception {
         myDriverReference.set(myDriver);
         when(myDriver.receive()).thenThrow(new MyDriverException("Error occurred when receive."));
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
@@ -114,7 +119,7 @@ public class MyConnectionReceiverTest {
         new Thread(myConnectionReceiver).start();
         Thread.sleep(100);
 
-        verify(myDriver, times(1)).receive();
+        verify(myDriver).receive();
         verify(myDriver).close();
         assertThat(myDriverReference.get(), nullValue());
         verify(threadFactory).newThread(myConnectionOpener);
@@ -124,7 +129,7 @@ public class MyConnectionReceiverTest {
         final MyDriverAdapter myDriverAdapter2 = mock(MyDriverAdapter.class);
         myDriverReference.set(myDriverAdapter2);
         Thread.sleep(100);
-        verify(myDriverAdapter2, times(1)).receive();
+        verify(myDriverAdapter2).receive();
     }
 
     @Test
@@ -147,8 +152,13 @@ public class MyConnectionReceiverTest {
         verifyNoMoreInteractions(mySubscriber);
     }
 
+    /**
+     * 删除订阅者会向MyDriver发送消息
+     *
+     * @throws Exception e
+     */
     @Test
-    public void testRunAndClose() throws Exception {
+    public void testRunAndRemoveSubscriber() throws Exception {
         final String message = "else";
         myDriverReference.set(myDriver);
 
@@ -165,6 +175,37 @@ public class MyConnectionReceiverTest {
 
         verify(mySubscriber).onBegin();
 
+        verifyNoMoreInteractions(mySubscriber);
+        verify(myDriver).removeQuery(queryId);
+    }
+
+    @Test
+    public void testRunAndRemoveSubscriberThrowException() throws Exception {
+        final String message = "else";
+        myDriverReference.set(myDriver);
+
+        when(myDriver.receive()).thenReturn(new MyData(queryId, "begin")).thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocation) throws Throwable {
+                myConnectionReceiver.removeSubscriber(queryId);
+                return new MyData(queryId, message);
+            }
+        }).thenReturn(null);
+        doThrow(new MyDriverException("Error occurred when receive query.")).when(myDriver).removeQuery(queryId);
+        myConnectionReceiver.addSubscriber(queryId, mySubscriber);
+
+        new Thread(myConnectionReceiver).start();
+        Thread.sleep(100);
+
+        verify(mySubscriber).onBegin();
+
+        verifyNoMoreInteractions(mySubscriber);
+
+        verify(myDriver).removeQuery(queryId);
+        verify(myDriver).close();
+        assertThat(myDriverReference.get(), nullValue());
+        verify(threadFactory).newThread(myConnectionOpener);
+        verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
     }
 
@@ -201,16 +242,12 @@ public class MyConnectionReceiverTest {
 
     @Test
     public void testRemoveQuery() throws Exception {
-        doThrow(new MyDriverException("Error occurred when receive query.")).when(myDriver).removeQuery(queryId);
         myDriverReference.set(myDriver);
+        myConnectionReceiver.addSubscriber(queryId, mySubscriber);
 
         myConnectionReceiver.removeSubscriber(queryId);
 
-        verify(myDriver).removeQuery(queryId);
-        verify(myDriver).close();
-        assertThat(myDriverReference.get(), nullValue());
-        verify(threadFactory).newThread(myConnectionOpener);
-        verify(thread).start();
-        verifyNoMoreInteractions(mySubscriber);
+        assertThat(myConnectionReceiver.getToBeRemovedQueryIds().contains(queryId), is(true));
+        verify(myDriver, never()).removeQuery(queryId);
     }
 }
