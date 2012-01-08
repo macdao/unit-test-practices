@@ -2,7 +2,7 @@ package myclient;
 
 import com.google.common.collect.ImmutableList;
 import myclient.factory.MyDriverFactory;
-import mydriver.MyDriverException;
+import mydriver2.MyDriverException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

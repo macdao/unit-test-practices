@@ -1,8 +1,8 @@
 package myclient;
 
-import mydriver.MyData;
-import mydriver.MyDriver;
-import mydriver.MyDriverException;
+import mydriver2.MyData;
+import mydriver2.MyDriver;
+import mydriver2.MyDriverException;
 
 public class MyDriverAdapter {
 
