@@ -6,7 +6,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class MyDriver {
+public final class MyDriver {
 
     private static final MyData STOP = new MyData(-1, null);
 

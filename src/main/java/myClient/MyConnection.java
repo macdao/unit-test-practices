@@ -1,6 +1,7 @@
 package myClient;
 
-import myDriver.MyDriver;
+import myClient.factory.MyConnectionOpenerFactory;
+import myClient.factory.MyConnectionReceiverFactory;
 
 import java.io.Closeable;
 import java.util.concurrent.ExecutorService;
@@ -13,7 +14,7 @@ public class MyConnection {
 
     private ExecutorService executorService = Executors.newSingleThreadExecutor();
     private String[] uris;
-    private AtomicReference<MyDriver> myDriverReference = new AtomicReference<MyDriver>();
+    private AtomicReference<MyDriverAdapter> myDriverReference = new AtomicReference<MyDriverAdapter>();
     private MyConnectionReceiver myConnectionReceiver;
     private MyConnectionReceiverFactory myConnectionReceiverFactory;
     private MyConnectionOpenerFactory myConnectionOpenerFactory;
@@ -56,7 +57,7 @@ public class MyConnection {
         this.executorService = executorService;
     }
 
-    public void setMyDriverReference(AtomicReference<MyDriver> myDriverReference) {
+    public void setMyDriverReference(AtomicReference<MyDriverAdapter> myDriverReference) {
         this.myDriverReference = myDriverReference;
     }
 

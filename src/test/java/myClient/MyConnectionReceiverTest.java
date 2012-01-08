@@ -19,10 +19,10 @@ public class MyConnectionReceiverTest {
 
     private int queryId;
     private MyConnectionReceiver myConnectionReceiver;
-    AtomicReference<MyDriver> myDriverReference=  new AtomicReference<MyDriver>();
+    AtomicReference<MyDriverAdapter> myDriverReference=  new AtomicReference<MyDriverAdapter>();
     @Mock
     MySubscriber mySubscriber;
-    @Mock MyDriver myDriver;
+    @Mock MyDriverAdapter myDriver;
 
 
     @Before

@@ -1,5 +1,7 @@
 package myClient;
 
+import myClient.factory.MyConnectionOpenerFactory;
+import myClient.factory.MyConnectionReceiverFactory;
 import myDriver.MyDriver;
 import org.junit.Before;
 import org.junit.Test;
@@ -22,7 +24,7 @@ public class MyConnectionTest {
     @Mock
     MySubscriber mySubscriber;
 
-    private AtomicReference<MyDriver> myDriverReference = new AtomicReference<MyDriver>();
+    private AtomicReference<MyDriverAdapter> myDriverReference = new AtomicReference<MyDriverAdapter>();
     @Mock
     MyConnectionReceiverFactory myConnectionReceiverFactory;
     @Mock

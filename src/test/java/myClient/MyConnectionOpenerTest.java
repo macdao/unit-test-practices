@@ -1,5 +1,6 @@
 package myClient;
 
+import myClient.factory.MyDriverFactory;
 import myDriver.MyDriver;
 import myDriver.MyDriverException;
 import org.junit.Before;
@@ -20,13 +21,13 @@ public class MyConnectionOpenerTest {
     private MyConnectionOpener myConnectionOpener;
     private String uri1;
     private String uri2;
-    private AtomicReference<MyDriver> myDriverReference;
+    private AtomicReference<MyDriverAdapter> myDriverReference;
     @Mock
     MyDriverFactory myDriverFactory;
     @Mock
-    MyDriver myDriver1;
+    MyDriverAdapter myDriver1;
     @Mock
-    MyDriver myDriver2;
+    MyDriverAdapter myDriver2;
     @Mock
     CommonUtility commonUtility;
     private int reconnectInterval;
@@ -36,7 +37,7 @@ public class MyConnectionOpenerTest {
         uri1 = "a";
         uri2 = "b";
         reconnectInterval = 100;
-        myDriverReference = new AtomicReference<MyDriver>();
+        myDriverReference = new AtomicReference<MyDriverAdapter>();
 
         myConnectionOpener = new MyConnectionOpener(new String[]{uri1, uri2}, reconnectInterval, myDriverReference);
         myConnectionOpener.setMyDriverFactory(myDriverFactory);

@@ -1,7 +1,6 @@
 package myClient;
 
 import myDriver.MyData;
-import myDriver.MyDriver;
 import myDriver.MyDriverException;
 
 import java.util.HashMap;
@@ -9,10 +8,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MyConnectionReceiver implements Runnable {
-    private AtomicReference<MyDriver> myDriverReference;
+    private AtomicReference<MyDriverAdapter> myDriverReference;
     private final Map<Integer, MySubscriber> mySubscriberMap = new HashMap<Integer, MySubscriber>();
 
-    public MyConnectionReceiver(AtomicReference<MyDriver> myDriverReference) {
+    public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference) {
         this.myDriverReference = myDriverReference;
     }
 

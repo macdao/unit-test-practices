@@ -1,6 +1,6 @@
 package myClient;
 
-import myDriver.MyDriver;
+import myClient.factory.MyDriverFactory;
 import myDriver.MyDriverException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,12 +10,12 @@ import java.util.concurrent.atomic.AtomicReference;
 public class MyConnectionOpener implements Runnable {
     private String[] uris;
     private int reconnectInterval;
-    private AtomicReference<MyDriver> myDriverReference;
+    private AtomicReference<MyDriverAdapter> myDriverReference;
     private MyDriverFactory myDriverFactory;
     private CommonUtility commonUtility;
     private Logger logger = LoggerFactory.getLogger(getClass());
 
-    public MyConnectionOpener(String[] uris, int reconnectInterval, AtomicReference<MyDriver> myDriverReference) {
+    public MyConnectionOpener(String[] uris, int reconnectInterval, AtomicReference<MyDriverAdapter> myDriverReference) {
         this.uris = uris;
         this.reconnectInterval = reconnectInterval;
         this.myDriverReference = myDriverReference;
@@ -30,7 +30,7 @@ public class MyConnectionOpener implements Runnable {
             }
 
             String uri = uris[i++];
-            MyDriver myDriver = myDriverFactory.newMyDriver(uri);
+            MyDriverAdapter myDriver = myDriverFactory.newMyDriver(uri);
             try {
                 myDriver.connect();
                 myDriverReference.set(myDriver);
