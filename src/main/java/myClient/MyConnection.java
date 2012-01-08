@@ -4,41 +4,46 @@ import myClient.factory.MyConnectionOpenerFactory;
 import myClient.factory.MyConnectionReceiverFactory;
 
 import java.io.Closeable;
-import java.util.concurrent.ExecutorService;
+import java.io.IOException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MyConnection {
 
     public final static int RECONNECT_INTERVAL = 3000;
 
-    private ExecutorService executorService = Executors.newSingleThreadExecutor();
-    private String[] uris;
-    private AtomicReference<MyDriverAdapter> myDriverReference = new AtomicReference<MyDriverAdapter>();
+    private ThreadFactory threadFactory = Executors.defaultThreadFactory();
+    private AtomicReference<MyDriverAdapter> myDriverReference;
     private MyConnectionReceiver myConnectionReceiver;
     private MyConnectionReceiverFactory myConnectionReceiverFactory;
-    private MyConnectionOpenerFactory myConnectionOpenerFactory;
+    private final MyConnectionOpener myConnectionOpener;
 
-    public MyConnection(String[] uris) {
-        this.uris = uris;
+    public MyConnection(String[] uris, MyConnectionOpenerFactory myConnectionOpenerFactory, AtomicReference<MyDriverAdapter> myDriverReference) {
+        this.myDriverReference = myDriverReference;
+        myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(uris, RECONNECT_INTERVAL, myDriverReference);
     }
 
     public void open() {
-        MyConnectionOpener myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(uris, RECONNECT_INTERVAL, myDriverReference);
-        executorService.submit(myConnectionOpener);
+        threadFactory.newThread(myConnectionOpener).start();
     }
 
-    public Closeable subscribe(int queryId, MySubscriber subscriber) {
+    public Closeable subscribe(final int queryId, MySubscriber subscriber) {
         if (myConnectionReceiver == null) {
             synchronized (this) {
                 if (myConnectionReceiver == null) {
-                    myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference);
-                    executorService.submit(myConnectionReceiver);
+                    myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener);
+                    threadFactory.newThread(myConnectionReceiver).start();
                 }
             }
         }
         myConnectionReceiver.addSubscriber(queryId, subscriber);
-        return null;
+        return new Closeable() {
+            @Override
+            public void close() throws IOException {
+                myConnectionReceiver.removeSubscriber(queryId);
+            }
+        };
     }
 
     public void close() {
@@ -53,19 +58,11 @@ public class MyConnection {
         throw new RuntimeException("Not implemented");
     }
 
-    public void setExecutorService(ExecutorService executorService) {
-        this.executorService = executorService;
-    }
-
-    public void setMyDriverReference(AtomicReference<MyDriverAdapter> myDriverReference) {
-        this.myDriverReference = myDriverReference;
+    public void setThreadFactory(ThreadFactory threadFactory) {
+        this.threadFactory = threadFactory;
     }
 
     public void setMyConnectionReceiverFactory(MyConnectionReceiverFactory myConnectionReceiverFactory) {
         this.myConnectionReceiverFactory = myConnectionReceiverFactory;
-    }
-
-    public void setMyConnectionOpenerFactory(MyConnectionOpenerFactory myConnectionOpenerFactory) {
-        this.myConnectionOpenerFactory = myConnectionOpenerFactory;
     }
 }

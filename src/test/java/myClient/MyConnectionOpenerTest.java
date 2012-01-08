@@ -1,7 +1,6 @@
 package myClient;
 
 import myClient.factory.MyDriverFactory;
-import myDriver.MyDriver;
 import myDriver.MyDriverException;
 import org.junit.Before;
 import org.junit.Test;
@@ -26,8 +25,6 @@ public class MyConnectionOpenerTest {
     MyDriverFactory myDriverFactory;
     @Mock
     MyDriverAdapter myDriver1;
-    @Mock
-    MyDriverAdapter myDriver2;
     @Mock
     CommonUtility commonUtility;
     private int reconnectInterval;
@@ -54,8 +51,17 @@ public class MyConnectionOpenerTest {
         assertThat(myDriverReference.get(), is(myDriver1));
     }
 
+    /**
+     * 从第一个uri开始连接，如果连接失败，则尝试连接下一个uri，
+     * 如果最后一个uri也失败则重新尝试第一个uri，直至成功。
+     * 两次尝试之间都需要等待一段时间（ReconnectInterval）。
+     *
+     * @throws Exception e
+     */
     @Test
     public void testRun2() throws Exception {
+        MyDriverAdapter myDriver2 = mock(MyDriverAdapter.class);
+
         when(myDriverFactory.newMyDriver(uri1)).thenReturn(myDriver1);
         when(myDriverFactory.newMyDriver(uri2)).thenReturn(myDriver2);
         doThrow(new MyDriverException("Error occurred when connect.")).when(myDriver1).connect();
