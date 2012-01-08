@@ -4,56 +4,50 @@ import myDriver.MyData;
 import myDriver.MyDriver;
 import myDriver.MyDriverException;
 
-/**
- * Created by IntelliJ IDEA.
- * User: Macdao
- * Date: 12-1-7
- * Time: 下午11:51
- * To change this template use File | Settings | File Templates.
- */
-public class MyConnectionReceiver implements Runnable {
-    private MyDriver myDriver;
-    private MySubscriber mySubscriber;
-    private int queryId;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
-    public MyConnectionReceiver(MyDriver myDriver, MySubscriber mySubscriber, int queryId) {
-        this.myDriver = myDriver;
-        this.mySubscriber = mySubscriber;
-        this.queryId = queryId;
+public class MyConnectionReceiver implements Runnable {
+    private AtomicReference<MyDriver> myDriverReference;
+    private final Map<Integer, MySubscriber> mySubscriberMap = new HashMap<Integer, MySubscriber>();
+
+    public MyConnectionReceiver(AtomicReference<MyDriver> myDriverReference) {
+        this.myDriverReference = myDriverReference;
     }
 
     @Override
     public void run() {
         while (true) {
+            if (myDriverReference.get() == null) {
+                return;
+            }
             MyData myData = null;
             try {
-                myData = myDriver.receive();
+                myData = myDriverReference.get().receive();
             } catch (MyDriverException e) {
                 //todo
             }
-            if (myData != null) {
-                if (queryId == myData.queryId) {
+            if (myData == null) {
+                break;
+            } else {
+                if (mySubscriberMap.containsKey(myData.queryId)) {
+                    MySubscriber mySubscriber = mySubscriberMap.get(myData.queryId);
                     if ("begin".equals(myData.value)) {
                         mySubscriber.onBegin();
-                    }else{
+                    } else {
                         mySubscriber.onMessage(myData.value);
                     }
                 }
-            } else {
-                //todo
             }
         }
     }
 
-    public MyDriver getMyDriver() {
-        return myDriver;
-    }
+    public synchronized void addSubscriber(int queryId, MySubscriber subscriber) throws QueryIdDuplicateException {
+        if (mySubscriberMap.containsKey(queryId)) {
+            throw new QueryIdDuplicateException(queryId);
+        }
 
-    public MySubscriber getMySubscriber() {
-        return mySubscriber;
-    }
-
-    public int getQueryId() {
-        return queryId;
+        mySubscriberMap.put(queryId, subscriber);
     }
 }

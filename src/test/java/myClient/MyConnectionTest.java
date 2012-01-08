@@ -1,23 +1,15 @@
 package myClient;
 
-import myDriver.MyData;
 import myDriver.MyDriver;
-import org.hamcrest.CoreMatchers;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.hamcrest.CoreMatchers.*;
-import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,9 +21,16 @@ public class MyConnectionTest {
     ExecutorService executorService;
     @Mock
     MySubscriber mySubscriber;
-    @Mock
-    MyDriver myDriver;
+
     private AtomicReference<MyDriver> myDriverReference = new AtomicReference<MyDriver>();
+    @Mock
+    MyConnectionReceiverFactory myConnectionReceiverFactory;
+    @Mock
+    MyConnectionReceiver myConnectionReceiver;
+    @Mock
+    MyConnectionOpenerFactory myConnectionOpenerFactory;
+    @Mock
+    MyConnectionOpener myConnectionOpener;
 
     @Before
     public void setUp() throws Exception {
@@ -39,32 +38,29 @@ public class MyConnectionTest {
         myConnection = new MyConnection(uris);
         myConnection.setExecutorService(executorService);
         myConnection.setMyDriverReference(myDriverReference);
+        myConnection.setMyConnectionReceiverFactory(myConnectionReceiverFactory);
+        myConnection.setMyConnectionOpenerFactory(myConnectionOpenerFactory);
+
+        when(myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference)).thenReturn(myConnectionReceiver);
+        when(myConnectionOpenerFactory.newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, myDriverReference)).thenReturn(myConnectionOpener);
     }
 
     @Test
     public void testOpen() throws Exception {
         myConnection.open();
 
-        ArgumentCaptor<MyConnectionOpener> argument = ArgumentCaptor.forClass(MyConnectionOpener.class);
-        verify(executorService).submit(argument.capture());
-        assertThat(argument.getValue().getUris(), equalTo(uris));
-        assertThat(argument.getValue().getReconnectInterval(), equalTo(MyConnection.RECONNECT_INTERVAL));
-        assertThat(argument.getValue().getMyDriverReference(), is(myDriverReference));
+        verify(myConnectionOpenerFactory).newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, myDriverReference);
+        verify(executorService).submit(myConnectionOpener);
     }
 
     @Test
     public void testSubscribe() throws Exception {
         int queryId = 123;
-        myDriverReference.set(myDriver);
-
         myConnection.subscribe(queryId, mySubscriber);
 
-        ArgumentCaptor<MyConnectionReceiver> argument = ArgumentCaptor.forClass(MyConnectionReceiver.class);
-        verify(executorService).submit(argument.capture());
-        assertThat(argument.getValue().getQueryId(), is(queryId));
-        assertThat(argument.getValue().getMySubscriber(), is(mySubscriber));
-        assertThat(argument.getValue().getMyDriver(), is(myDriver));
-
+        verify(executorService).submit(myConnectionReceiver);
+        verify(myConnectionReceiverFactory).newMyConnectionReceiver(myDriverReference);
+        verify(myConnectionReceiver).addSubscriber(queryId, mySubscriber);
     }
 
     @Test

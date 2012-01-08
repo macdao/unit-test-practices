@@ -14,17 +14,29 @@ public class MyConnection {
     private ExecutorService executorService = Executors.newSingleThreadExecutor();
     private String[] uris;
     private AtomicReference<MyDriver> myDriverReference = new AtomicReference<MyDriver>();
+    private MyConnectionReceiver myConnectionReceiver;
+    private MyConnectionReceiverFactory myConnectionReceiverFactory;
+    private MyConnectionOpenerFactory myConnectionOpenerFactory;
 
     public MyConnection(String[] uris) {
         this.uris = uris;
     }
 
     public void open() {
-        executorService.submit(new MyConnectionOpener(uris, RECONNECT_INTERVAL, myDriverReference));
+        MyConnectionOpener myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(uris, RECONNECT_INTERVAL, myDriverReference);
+        executorService.submit(myConnectionOpener);
     }
 
     public Closeable subscribe(int queryId, MySubscriber subscriber) {
-        executorService.submit(new MyConnectionReceiver(getMyDriver(),subscriber,queryId));
+        if (myConnectionReceiver == null) {
+            synchronized (this) {
+                if (myConnectionReceiver == null) {
+                    myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference);
+                    executorService.submit(myConnectionReceiver);
+                }
+            }
+        }
+        myConnectionReceiver.addSubscriber(queryId, subscriber);
         return null;
     }
 
@@ -40,15 +52,19 @@ public class MyConnection {
         throw new RuntimeException("Not implemented");
     }
 
-    public MyDriver getMyDriver(){
-        return myDriverReference.get();
-    }
-
     public void setExecutorService(ExecutorService executorService) {
         this.executorService = executorService;
     }
 
     public void setMyDriverReference(AtomicReference<MyDriver> myDriverReference) {
         this.myDriverReference = myDriverReference;
+    }
+
+    public void setMyConnectionReceiverFactory(MyConnectionReceiverFactory myConnectionReceiverFactory) {
+        this.myConnectionReceiverFactory = myConnectionReceiverFactory;
+    }
+
+    public void setMyConnectionOpenerFactory(MyConnectionOpenerFactory myConnectionOpenerFactory) {
+        this.myConnectionOpenerFactory = myConnectionOpenerFactory;
     }
 }

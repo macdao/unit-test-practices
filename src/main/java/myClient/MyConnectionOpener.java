@@ -7,13 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Created by IntelliJ IDEA.
- * User: Macdao
- * Date: 12-1-7
- * Time: 下午9:22
- * To change this template use File | Settings | File Templates.
- */
 public class MyConnectionOpener implements Runnable {
     private String[] uris;
     private int reconnectInterval;
@@ -47,18 +40,6 @@ public class MyConnectionOpener implements Runnable {
             }
             commonUtility.threadSleep(reconnectInterval);
         }
-    }
-
-    public String[] getUris() {
-        return uris;
-    }
-
-    public int getReconnectInterval() {
-        return reconnectInterval;
-    }
-
-    public AtomicReference<MyDriver> getMyDriverReference() {
-        return myDriverReference;
     }
 
     public void setMyDriverFactory(MyDriverFactory myDriverFactory) {

@@ -2,7 +2,6 @@ package myClient;
 
 import myDriver.MyDriver;
 import myDriver.MyDriverException;
-import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -13,25 +12,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
-/**
- * Created by IntelliJ IDEA.
- * User: Macdao
- * Date: 12-1-7
- * Time: 下午9:32
- * To change this template use File | Settings | File Templates.
- */
 @RunWith(MockitoJUnitRunner.class)
 public class MyConnectionOpenerTest {
 
     private MyConnectionOpener myConnectionOpener;
-    private String[] uris;
     private String uri1;
     private String uri2;
-    private String uri3;
     private AtomicReference<MyDriver> myDriverReference;
     @Mock
     MyDriverFactory myDriverFactory;
@@ -40,20 +28,17 @@ public class MyConnectionOpenerTest {
     @Mock
     MyDriver myDriver2;
     @Mock
-    MyDriver myDriver3;
-    @Mock CommonUtility commonUtility;
+    CommonUtility commonUtility;
     private int reconnectInterval;
 
     @Before
     public void setUp() throws Exception {
         uri1 = "a";
         uri2 = "b";
-        uri3 = "c";
-        uris = new String[]{uri1, uri2, uri3};
         reconnectInterval = 100;
         myDriverReference = new AtomicReference<MyDriver>();
 
-        myConnectionOpener = new MyConnectionOpener(uris, reconnectInterval, myDriverReference);
+        myConnectionOpener = new MyConnectionOpener(new String[]{uri1, uri2}, reconnectInterval, myDriverReference);
         myConnectionOpener.setMyDriverFactory(myDriverFactory);
         myConnectionOpener.setCommonUtility(commonUtility);
     }
@@ -65,7 +50,7 @@ public class MyConnectionOpenerTest {
         myConnectionOpener.run();
 
         verify(myDriver1).connect();
-        assertThat(myConnectionOpener.getMyDriverReference().get(), is(myDriver1));
+        assertThat(myDriverReference.get(), is(myDriver1));
     }
 
     @Test
@@ -79,6 +64,6 @@ public class MyConnectionOpenerTest {
         verify(myDriver1).connect();
         verify(myDriver2).connect();
         verify(commonUtility).threadSleep(reconnectInterval);
-        assertThat(myConnectionOpener.getMyDriverReference().get(), is(myDriver2));
+        assertThat(myDriverReference.get(), is(myDriver2));
     }
 }
