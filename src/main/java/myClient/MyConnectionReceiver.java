@@ -14,6 +14,7 @@ public class MyConnectionReceiver implements Runnable {
     private final Map<Integer, MySubscriber> mySubscriberMap = new HashMap<Integer, MySubscriber>();
     private ThreadFactory threadFactory = Executors.defaultThreadFactory();
     private MyConnectionOpener myConnectionOpener;
+    private boolean queryIdAdded;
 
     public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference, MyConnectionOpener myConnectionOpener) {
         this.myDriverReference = myDriverReference;
@@ -23,18 +24,30 @@ public class MyConnectionReceiver implements Runnable {
     @Override
     public void run() {
         while (true) {
-            MyDriverAdapter myDriverAdapter = myDriverReference.get();
+            final MyDriverAdapter myDriverAdapter = myDriverReference.get();
             if (myDriverAdapter == null) {
-                return;
+                continue;
             }
-            MyData myData = null;
+
+            synchronized (this) {
+                if (queryIdAdded) {
+                    try {
+                        addQuery(myDriverAdapter);
+                    } catch (MyDriverException e) {
+                        handleTransferException(myDriverAdapter);
+                        continue;
+                    }
+                    queryIdAdded = false;
+                }
+            }
+
+            final MyData myData;
             try {
                 myData = myDriverAdapter.receive();
             } catch (MyDriverException e) {
                 //事情大条了
-                myDriverAdapter.close();
-                myDriverReference.set(null);
-                threadFactory.newThread(myConnectionOpener).start();
+                handleTransferException(myDriverAdapter);
+                continue;
             }
             if (myData == null) {
                 break;
@@ -52,19 +65,55 @@ public class MyConnectionReceiver implements Runnable {
     }
 
     public void addSubscriber(int queryId, MySubscriber subscriber) throws QueryIdDuplicateException {
-        if (mySubscriberMap.containsKey(queryId)) {
-            throw new QueryIdDuplicateException(queryId);
-        }
-
         synchronized (mySubscriberMap) {
+            if (mySubscriberMap.containsKey(queryId)) {
+                throw new QueryIdDuplicateException(queryId);
+            }
             mySubscriberMap.put(queryId, subscriber);
+            synchronized (this) {
+                queryIdAdded = true;
+            }
         }
     }
 
     public void removeSubscriber(int queryId) {
         synchronized (mySubscriberMap) {
             mySubscriberMap.remove(queryId);
+
+            MyDriverAdapter myDriverAdapter = myDriverReference.get();
+            if (myDriverAdapter != null) {
+                try {
+                    myDriverAdapter.removeQuery(queryId);
+                } catch (MyDriverException e) {
+                    handleTransferException(myDriverAdapter);
+                }
+            }
         }
+    }
+
+    private void addQuery(MyDriverAdapter myDriverAdapter) throws MyDriverException {
+        for (int key : mySubscriberMap.keySet()) {
+            myDriverAdapter.addQuery(key);
+        }
+    }
+
+    private void handleTransferException(MyDriverAdapter myDriverAdapter) {
+        myDriverAdapter.close();
+        myDriverReference.set(null);
+        threadFactory.newThread(myConnectionOpener).start();
+        queryIdAdded = true;
+    }
+
+    public boolean isQueryIdAdded() {
+        return queryIdAdded;
+    }
+
+    public void setQueryIdAdded(boolean queryIdAdded) {
+        this.queryIdAdded = queryIdAdded;
+    }
+
+    public Map<Integer, MySubscriber> getMySubscriberMap() {
+        return mySubscriberMap;
     }
 
     public void setThreadFactory(ThreadFactory threadFactory) {

@@ -19,6 +19,10 @@ public class MyConnection {
     private MyConnectionReceiverFactory myConnectionReceiverFactory;
     private final MyConnectionOpener myConnectionOpener;
 
+    public MyConnection(String[] uris) {
+        this(uris, new MyConnectionOpenerFactory(), new AtomicReference<MyDriverAdapter>());
+    }
+
     public MyConnection(String[] uris, MyConnectionOpenerFactory myConnectionOpenerFactory, AtomicReference<MyDriverAdapter> myDriverReference) {
         this.myDriverReference = myDriverReference;
         myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(uris, RECONNECT_INTERVAL, myDriverReference);
