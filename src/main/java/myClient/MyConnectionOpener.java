@@ -2,23 +2,21 @@ package myClient;
 
 import myClient.factory.MyDriverFactory;
 import myDriver.MyDriverException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.EventObject;
+import java.util.List;
 
 public class MyConnectionOpener implements Runnable {
     private String[] uris;
     private int reconnectInterval;
-    private AtomicReference<MyDriverAdapter> myDriverReference;
     private MyDriverFactory myDriverFactory;
     private CommonUtility commonUtility;
-    private Logger logger = LoggerFactory.getLogger(getClass());
+    private final List<MyConnectionEventListener> listeners;
 
-    public MyConnectionOpener(String[] uris, int reconnectInterval, AtomicReference<MyDriverAdapter> myDriverReference) {
+    public MyConnectionOpener(String[] uris, int reconnectInterval, List<MyConnectionEventListener> listeners) {
         this.uris = uris;
         this.reconnectInterval = reconnectInterval;
-        this.myDriverReference = myDriverReference;
+        this.listeners = listeners;
     }
 
     @Override
@@ -33,10 +31,14 @@ public class MyConnectionOpener implements Runnable {
             MyDriverAdapter myDriver = myDriverFactory.newMyDriver(uri);
             try {
                 myDriver.connect();
-                myDriverReference.set(myDriver);
+                for (MyConnectionEventListener listener : listeners) {
+                    listener.connected(new EventObject(myDriver));
+                }
                 break;
             } catch (MyDriverException e) {
-                logger.warn("Failed to connect to uri {} and got '{}'", uri, e.getMessage());
+                for (MyConnectionEventListener listener : listeners) {
+                    listener.connectionFailed(new EventObject(myDriver));
+                }
             }
             commonUtility.threadSleep(reconnectInterval);
         }

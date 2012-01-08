@@ -1,5 +1,6 @@
 package myClient;
 
+import com.google.common.collect.ImmutableList;
 import myClient.factory.MyDriverFactory;
 import myDriver.MyDriverException;
 import org.junit.Before;
@@ -8,10 +9,8 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.EventObject;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -20,7 +19,6 @@ public class MyConnectionOpenerTest {
     private MyConnectionOpener myConnectionOpener;
     private String uri1;
     private String uri2;
-    private AtomicReference<MyDriverAdapter> myDriverReference;
     @Mock
     MyDriverFactory myDriverFactory;
     @Mock
@@ -28,15 +26,16 @@ public class MyConnectionOpenerTest {
     @Mock
     CommonUtility commonUtility;
     private int reconnectInterval;
+    @Mock
+    MyConnectionEventListener listener;
 
     @Before
     public void setUp() throws Exception {
         uri1 = "a";
         uri2 = "b";
         reconnectInterval = 100;
-        myDriverReference = new AtomicReference<MyDriverAdapter>();
 
-        myConnectionOpener = new MyConnectionOpener(new String[]{uri1, uri2}, reconnectInterval, myDriverReference);
+        myConnectionOpener = new MyConnectionOpener(new String[]{uri1, uri2}, reconnectInterval, ImmutableList.of(listener));
         myConnectionOpener.setMyDriverFactory(myDriverFactory);
         myConnectionOpener.setCommonUtility(commonUtility);
     }
@@ -48,7 +47,7 @@ public class MyConnectionOpenerTest {
         myConnectionOpener.run();
 
         verify(myDriver1).connect();
-        assertThat(myDriverReference.get(), is(myDriver1));
+        verify(listener).connected(any(EventObject.class));
     }
 
     /**
@@ -71,6 +70,7 @@ public class MyConnectionOpenerTest {
         verify(myDriver1).connect();
         verify(myDriver2).connect();
         verify(commonUtility).threadSleep(reconnectInterval);
-        assertThat(myDriverReference.get(), is(myDriver2));
+        verify(listener).connectionFailed(any(EventObject.class));
+        verify(listener).connected(any(EventObject.class));
     }
 }

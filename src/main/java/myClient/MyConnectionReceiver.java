@@ -3,10 +3,7 @@ package myClient;
 import myDriver.MyData;
 import myDriver.MyDriverException;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
@@ -18,10 +15,12 @@ public class MyConnectionReceiver implements Runnable {
     private MyConnectionOpener myConnectionOpener;
     private boolean queryIdAdded;
     private final Set<Integer> toBeRemovedQueryIds = new HashSet<Integer>();
+    private final List<MyConnectionEventListener> listeners;
 
-    public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference, MyConnectionOpener myConnectionOpener) {
+    public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference, MyConnectionOpener myConnectionOpener, List<MyConnectionEventListener> listeners) {
         this.myDriverReference = myDriverReference;
         this.myConnectionOpener = myConnectionOpener;
+        this.listeners = listeners;
     }
 
     @Override
@@ -120,8 +119,9 @@ public class MyConnectionReceiver implements Runnable {
     }
 
     private void handleTransferException(MyDriverAdapter myDriverAdapter) {
-        myDriverAdapter.close();
-        myDriverReference.set(null);
+        for (MyConnectionEventListener listener : listeners) {
+            listener.disconnected(new EventObject(myDriverAdapter));
+        }
         threadFactory.newThread(myConnectionOpener).start();
     }
 

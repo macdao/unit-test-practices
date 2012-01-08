@@ -1,5 +1,6 @@
 package myClient;
 
+import com.google.common.collect.Lists;
 import myClient.factory.MyConnectionOpenerFactory;
 import myClient.factory.MyConnectionReceiverFactory;
 import org.junit.Before;
@@ -9,10 +10,13 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.io.Closeable;
+import java.util.EventObject;
+import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.Assert.fail;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -39,19 +43,24 @@ public class MyConnectionTest {
     MyConnectionOpenerFactory myConnectionOpenerFactory;
     @Mock
     MyConnectionReceiverFactory myConnectionReceiverFactory;
+    @Mock
+    MyConnectionEventListener listener;
     private int queryId;
+    private List<MyConnectionEventListener> listeners;
 
 
     @Before
     public void setUp() throws Exception {
         myDriverReference = new AtomicReference<MyDriverAdapter>();
         uris = new String[]{};
-        when(myConnectionOpenerFactory.newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, myDriverReference)).thenReturn(myConnectionOpener);
+        listeners = Lists.newArrayList(listener);
+
+        when(myConnectionOpenerFactory.newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, listeners)).thenReturn(myConnectionOpener);
         when(threadFactory.newThread(myConnectionOpener)).thenReturn(openerThread);
         when(threadFactory.newThread(myConnectionReceiver)).thenReturn(receiverThread);
-        when(myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener)).thenReturn(myConnectionReceiver);
+        when(myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener, listeners)).thenReturn(myConnectionReceiver);
 
-        myConnection = new MyConnection(uris, myConnectionOpenerFactory, myDriverReference, myConnectionReceiverFactory, threadFactory);
+        myConnection = new MyConnection(uris, myConnectionOpenerFactory, myDriverReference, myConnectionReceiverFactory, threadFactory, listeners);
         queryId = 123;
     }
 
@@ -59,7 +68,7 @@ public class MyConnectionTest {
     public void testOpen() throws Exception {
         myConnection.open();
 
-        verify(myConnectionOpenerFactory).newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, myDriverReference);
+        verify(myConnectionOpenerFactory).newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, listeners);
         verify(threadFactory).newThread(myConnectionOpener);
         verify(openerThread).start();
     }
@@ -70,7 +79,7 @@ public class MyConnectionTest {
 
         verify(threadFactory).newThread(myConnectionReceiver);
         verify(receiverThread).start();
-        verify(myConnectionReceiverFactory).newMyConnectionReceiver(myDriverReference, myConnectionOpener);
+        verify(myConnectionReceiverFactory).newMyConnectionReceiver(myDriverReference, myConnectionOpener, listeners);
         verify(myConnectionReceiver).addSubscriber(queryId, mySubscriber);
 
         //该方法返回一个IDisposable对象，Dispose后即取消订阅，subscriber不会继续收到数据。
@@ -93,17 +102,10 @@ public class MyConnectionTest {
         myConnection.close();
 
         verify(myDriverAdapter).close();
+        assertThat(myDriverReference.get(), nullValue());
+
         myConnection.subscribe(queryId, mySubscriber);
-        verify(myConnectionReceiver,times(2)).addSubscriber(queryId,mySubscriber);
-    }
-
-    @Test
-    public void testAddConnectionListener() throws Exception {
-
-    }
-
-    @Test
-    public void testRemoveConnectionListener() throws Exception {
-
+        verify(myConnectionReceiver, times(2)).addSubscriber(queryId, mySubscriber);
+        verify(listener).disconnected(any(EventObject.class));
     }
 }

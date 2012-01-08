@@ -5,6 +5,9 @@ import myClient.factory.MyConnectionReceiverFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.EventObject;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
@@ -17,16 +20,19 @@ public class MyConnection {
     private final MyConnectionReceiver myConnectionReceiver;
     private final MyConnectionOpener myConnectionOpener;
     private final AtomicReference<MyDriverAdapter> myDriverReference;
+    private final List<MyConnectionEventListener> listeners;
 
     public MyConnection(String[] uris) {
-        this(uris, new MyConnectionOpenerFactory(), new AtomicReference<MyDriverAdapter>(), new MyConnectionReceiverFactory(), Executors.defaultThreadFactory());
+        this(uris, new MyConnectionOpenerFactory(), new AtomicReference<MyDriverAdapter>(), new MyConnectionReceiverFactory(), Executors.defaultThreadFactory(), new ArrayList<MyConnectionEventListener>());
     }
 
-    public MyConnection(String[] uris, MyConnectionOpenerFactory myConnectionOpenerFactory, AtomicReference<MyDriverAdapter> myDriverReference, MyConnectionReceiverFactory myConnectionReceiverFactory, ThreadFactory threadFactory) {
+    public MyConnection(String[] uris, MyConnectionOpenerFactory myConnectionOpenerFactory, final AtomicReference<MyDriverAdapter> myDriverReference, MyConnectionReceiverFactory myConnectionReceiverFactory, ThreadFactory threadFactory, List<MyConnectionEventListener> listeners) {
         this.threadFactory = threadFactory;
         this.myDriverReference = myDriverReference;
-        myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(uris, RECONNECT_INTERVAL, myDriverReference);
-        myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener);
+        listeners.add(new DefaultConnectionEventListener(myDriverReference));
+        this.listeners = listeners;
+        myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(uris, RECONNECT_INTERVAL, listeners);
+        myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener, listeners);
         threadFactory.newThread(myConnectionReceiver).start();
     }
 
@@ -46,16 +52,18 @@ public class MyConnection {
 
     public void close() {
         MyDriverAdapter myDriverAdapter = myDriverReference.get();
-        if (myDriverAdapter != null) {
-            myDriverAdapter.close();
+
+        for (MyConnectionEventListener listener : listeners) {
+            listener.disconnected(new EventObject(myDriverAdapter));
         }
     }
 
     public synchronized void addConnectionListener(MyConnectionEventListener listener) {
-        throw new RuntimeException("Not implemented");
+        listeners.add(listener);
     }
 
     public synchronized void removeConnectionListener(MyConnectionEventListener listener) {
-        throw new RuntimeException("Not implemented");
+        listeners.remove(listener);
     }
+
 }

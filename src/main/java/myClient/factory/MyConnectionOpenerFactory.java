@@ -1,12 +1,12 @@
 package myClient.factory;
 
+import myClient.MyConnectionEventListener;
 import myClient.MyConnectionOpener;
-import myClient.MyDriverAdapter;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
 
 public class MyConnectionOpenerFactory {
-    public MyConnectionOpener newMyConnectionOpener(String[] uris, int reconnectInterval, AtomicReference<MyDriverAdapter> myDriverReference) {
-        return new MyConnectionOpener(uris, reconnectInterval, myDriverReference);
+    public MyConnectionOpener newMyConnectionOpener(String[] uris, int reconnectInterval, List<MyConnectionEventListener> listeners) {
+        return new MyConnectionOpener(uris, reconnectInterval, listeners);
     }
 }

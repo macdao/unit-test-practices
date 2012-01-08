@@ -1,5 +1,6 @@
 package myClient;
 
+import com.google.common.collect.ImmutableList;
 import myDriver.MyData;
 import myDriver.MyDriverException;
 import org.junit.Before;
@@ -10,6 +11,7 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
 import org.mockito.stubbing.Answer;
 
+import java.util.EventObject;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -35,12 +37,14 @@ public class MyConnectionReceiverTest {
     ThreadFactory threadFactory;
     @Mock
     MyConnectionOpener myConnectionOpener;
+    @Mock
+    MyConnectionEventListener listener;
 
     @Before
     public void setUp() throws Exception {
         myDriverReference = new AtomicReference<MyDriverAdapter>();
         queryId = 123;
-        myConnectionReceiver = new MyConnectionReceiver(myDriverReference, myConnectionOpener);
+        myConnectionReceiver = new MyConnectionReceiver(myDriverReference, myConnectionOpener, ImmutableList.of(new DefaultConnectionEventListener(myDriverReference), listener));
         myConnectionReceiver.setThreadFactory(threadFactory);
 
         when(threadFactory.newThread(any(Runnable.class))).thenReturn(thread);
@@ -75,7 +79,7 @@ public class MyConnectionReceiverTest {
 
         new Thread(myConnectionReceiver).start();
         myDriverReference.set(myDriver);
-        Thread.sleep(100);
+        Thread.sleep(1);
 
         verify(myDriver).addQuery(queryId);
         verify(mySubscriber).onBegin();
@@ -92,7 +96,7 @@ public class MyConnectionReceiverTest {
         myConnectionReceiver.getMySubscriberMap().put(queryId, mySubscriber);
 
         new Thread(myConnectionReceiver).start();
-        Thread.sleep(100);
+        Thread.sleep(1);
 
         verify(myDriver).addQuery(queryId);
         verify(myDriver).close();
@@ -101,6 +105,7 @@ public class MyConnectionReceiverTest {
         verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
         verifyNoMoreInteractions(myDriver);
+        verify(listener).disconnected(any(EventObject.class));
     }
 
     /**
@@ -117,7 +122,7 @@ public class MyConnectionReceiverTest {
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
 
         new Thread(myConnectionReceiver).start();
-        Thread.sleep(100);
+        Thread.sleep(1);
 
         verify(myDriver).receive();
         verify(myDriver).close();
@@ -128,8 +133,9 @@ public class MyConnectionReceiverTest {
 
         final MyDriverAdapter myDriverAdapter2 = mock(MyDriverAdapter.class);
         myDriverReference.set(myDriverAdapter2);
-        Thread.sleep(100);
+        Thread.sleep(1);
         verify(myDriverAdapter2).receive();
+        verify(listener).disconnected(any(EventObject.class));
     }
 
     @Test
@@ -195,18 +201,17 @@ public class MyConnectionReceiverTest {
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
 
         new Thread(myConnectionReceiver).start();
-        Thread.sleep(100);
+        Thread.sleep(1);
 
         verify(mySubscriber).onBegin();
 
         verifyNoMoreInteractions(mySubscriber);
 
         verify(myDriver).removeQuery(queryId);
-        verify(myDriver).close();
-        assertThat(myDriverReference.get(), nullValue());
         verify(threadFactory).newThread(myConnectionOpener);
         verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
+        verify(listener).disconnected(any(EventObject.class));
     }
 
     /**
