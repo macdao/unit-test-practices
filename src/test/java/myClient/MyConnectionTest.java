@@ -1,8 +1,8 @@
-package myClient;
+package myclient;
 
 import com.google.common.collect.Lists;
-import myClient.factory.MyConnectionOpenerFactory;
-import myClient.factory.MyConnectionReceiverFactory;
+import myclient.factory.MyConnectionOpenerFactory;
+import myclient.factory.MyConnectionReceiverFactory;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

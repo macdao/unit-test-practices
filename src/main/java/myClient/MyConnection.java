@@ -1,7 +1,7 @@
-package myClient;
+package myclient;
 
-import myClient.factory.MyConnectionOpenerFactory;
-import myClient.factory.MyConnectionReceiverFactory;
+import myclient.factory.MyConnectionOpenerFactory;
+import myclient.factory.MyConnectionReceiverFactory;
 
 import java.io.Closeable;
 import java.io.IOException;

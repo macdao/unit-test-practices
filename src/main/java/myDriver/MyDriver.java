@@ -1,4 +1,4 @@
-package myDriver;
+package mydriver;
 
 import java.util.HashSet;
 import java.util.Set;

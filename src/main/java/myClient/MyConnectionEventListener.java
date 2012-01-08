@@ -1,4 +1,4 @@
-package myClient;
+package myclient;
 
 import java.util.EventListener;
 import java.util.EventObject;

@@ -1,2 +1,2 @@
-* Java package names (myDriver, myClient) should be all lower-case
+* Java package names (myDriver, myClient) should be all lower-case and I renamed them
 * If throw exception when addQuery and removeQuery, try reconnect just as receive

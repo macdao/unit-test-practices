@@ -1,4 +1,4 @@
-package myClient;
+package myclient;
 
 import java.util.EventObject;
 import java.util.concurrent.atomic.AtomicReference;

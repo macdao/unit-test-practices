@@ -1,7 +1,7 @@
-package myClient;
+package myclient;
 
-import myClient.factory.MyDriverFactory;
-import myDriver.MyDriverException;
+import myclient.factory.MyDriverFactory;
+import mydriver.MyDriverException;
 
 import java.util.EventObject;
 import java.util.List;

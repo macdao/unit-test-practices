@@ -1,8 +1,8 @@
-package myClient;
+package myclient;
 
 import com.google.common.collect.ImmutableList;
-import myDriver.MyData;
-import myDriver.MyDriverException;
+import mydriver.MyData;
+import mydriver.MyDriverException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -79,7 +79,7 @@ public class MyConnectionReceiverTest {
 
         new Thread(myConnectionReceiver).start();
         myDriverReference.set(myDriver);
-        Thread.sleep(1);
+        Thread.sleep(10);
 
         verify(myDriver).addQuery(queryId);
         verify(mySubscriber).onBegin();
@@ -96,7 +96,7 @@ public class MyConnectionReceiverTest {
         myConnectionReceiver.getMySubscriberMap().put(queryId, mySubscriber);
 
         new Thread(myConnectionReceiver).start();
-        Thread.sleep(1);
+        Thread.sleep(10);
 
         verify(myDriver).addQuery(queryId);
         verify(myDriver).close();
@@ -122,7 +122,7 @@ public class MyConnectionReceiverTest {
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
 
         new Thread(myConnectionReceiver).start();
-        Thread.sleep(1);
+        Thread.sleep(10);
 
         verify(myDriver).receive();
         verify(myDriver).close();
@@ -133,7 +133,7 @@ public class MyConnectionReceiverTest {
 
         final MyDriverAdapter myDriverAdapter2 = mock(MyDriverAdapter.class);
         myDriverReference.set(myDriverAdapter2);
-        Thread.sleep(1);
+        Thread.sleep(10);
         verify(myDriverAdapter2).receive();
         verify(listener).disconnected(any(EventObject.class));
     }
@@ -201,7 +201,7 @@ public class MyConnectionReceiverTest {
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
 
         new Thread(myConnectionReceiver).start();
-        Thread.sleep(1);
+        Thread.sleep(10);
 
         verify(mySubscriber).onBegin();
 
@@ -212,6 +212,7 @@ public class MyConnectionReceiverTest {
         verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
         verify(listener).disconnected(any(EventObject.class));
+        assertThat(myConnectionReceiver.isQueryIdAdded(),is(true));
     }
 
     /**

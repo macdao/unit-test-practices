@@ -1,4 +1,4 @@
-package myClient;
+package myclient;
 
 public class QueryIdDuplicateException extends RuntimeException {
     public QueryIdDuplicateException(int queryId) {

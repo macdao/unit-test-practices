@@ -1,9 +1,9 @@
-package myClient.factory;
+package myclient.factory;
 
-import myClient.MyConnectionEventListener;
-import myClient.MyConnectionOpener;
-import myClient.MyConnectionReceiver;
-import myClient.MyDriverAdapter;
+import myclient.MyConnectionEventListener;
+import myclient.MyConnectionOpener;
+import myclient.MyConnectionReceiver;
+import myclient.MyDriverAdapter;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;

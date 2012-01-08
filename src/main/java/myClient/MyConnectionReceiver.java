@@ -1,7 +1,7 @@
-package myClient;
+package myclient;
 
-import myDriver.MyData;
-import myDriver.MyDriverException;
+import mydriver.MyData;
+import mydriver.MyDriverException;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -50,6 +50,7 @@ public class MyConnectionReceiver implements Runnable {
                     } catch (MyDriverException e) {
                         handleTransferException(myDriverAdapter);
                         toBeRemovedQueryIds.clear();
+                        queryIdAdded = true;
                         continue;
                     }
                 }

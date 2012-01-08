@@ -1,4 +1,4 @@
-package myDriver;
+package mydriver;
 
 public class Program {
 

@@ -1,6 +1,6 @@
-package myClient.factory;
+package myclient.factory;
 
-import myClient.MyDriverAdapter;
+import myclient.MyDriverAdapter;
 
 public class MyDriverFactory {
     public MyDriverAdapter newMyDriver(String uri) {

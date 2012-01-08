@@ -1,7 +1,7 @@
-package myClient.factory;
+package myclient.factory;
 
-import myClient.MyConnectionEventListener;
-import myClient.MyConnectionOpener;
+import myclient.MyConnectionEventListener;
+import myclient.MyConnectionOpener;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package myClient;
+package myclient;
 
 public interface MySubscriber {
     void onBegin();

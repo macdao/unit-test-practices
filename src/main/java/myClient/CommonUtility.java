@@ -1,4 +1,4 @@
-package myClient;
+package myclient;
 
 public class CommonUtility {
     void threadSleep(int millis) {

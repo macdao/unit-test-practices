@@ -1,4 +1,4 @@
-package myDriver;
+package mydriver;
 
 public final class MyDriverException extends Exception {
     /**
