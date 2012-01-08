@@ -1,8 +1,8 @@
 package myclient;
 
 import com.google.common.collect.ImmutableList;
-import mydriver2.MyData;
-import mydriver2.MyDriverException;
+import mydriver.MyData;
+import mydriver.MyDriverException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

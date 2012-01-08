@@ -1,7 +1,7 @@
 package myclient;
 
-import mydriver2.MyData;
-import mydriver2.MyDriverException;
+import mydriver.MyData;
+import mydriver.MyDriverException;
 
 import java.util.*;
 import java.util.concurrent.Executors;
