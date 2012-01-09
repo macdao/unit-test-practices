@@ -76,10 +76,10 @@ public class MyConnectionReceiverTest {
         String message = "else";
         when(myDriver.receive()).thenReturn(new MyData(queryId, "begin"), new MyData(queryId, message), null);
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
-
-        new Thread(myConnectionReceiver).start();
         myDriverReference.set(myDriver);
-        Thread.sleep(10);
+
+        myConnectionReceiver.run();
+
 
         verify(myDriver).addQuery(queryId);
         verify(mySubscriber).onBegin();
@@ -91,16 +91,25 @@ public class MyConnectionReceiverTest {
     @Test
     public void testRunAndAddQueryThrowException() throws Exception {
         myDriverReference.set(myDriver);
+        final MyDriverAdapter myDriverAdapter2 = mock(MyDriverAdapter.class);
         doThrow(new MyDriverException("Error occurred when add query.")).when(myDriver).addQuery(queryId);
+        doAnswer(new Answer<Void>(
+
+        ) {
+            @Override
+            public Void answer(InvocationOnMock invocation) throws Throwable {
+                myDriverReference.set(myDriverAdapter2);
+                return null;
+            }
+        }).when(thread).start();
+        when(myDriverAdapter2.receive()).thenReturn(null);
         myConnectionReceiver.setQueryIdAdded(true);
         myConnectionReceiver.getMySubscriberMap().put(queryId, mySubscriber);
 
-        new Thread(myConnectionReceiver).start();
-        Thread.sleep(10);
-
+        myConnectionReceiver.run();
+        
         verify(myDriver).addQuery(queryId);
         verify(myDriver).close();
-        assertThat(myDriverReference.get(), nullValue());
         verify(threadFactory).newThread(myConnectionOpener);
         verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
