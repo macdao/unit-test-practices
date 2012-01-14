@@ -4,28 +4,27 @@ import mydriver.MyData;
 import mydriver.MyDriverException;
 
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MyConnectionReceiver implements Runnable {
     private AtomicReference<MyDriverAdapter> myDriverReference;
     private final Map<Integer, MySubscriber> mySubscriberMap = new HashMap<Integer, MySubscriber>();
-    private ThreadFactory threadFactory = Executors.defaultThreadFactory();
-    private MyConnectionOpener myConnectionOpener;
     private boolean queryIdAdded;
     private final Set<Integer> toBeRemovedQueryIds = new HashSet<Integer>();
     private final List<MyConnectionEventListener> listeners;
+    private boolean closed;
 
-    public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference, MyConnectionOpener myConnectionOpener, List<MyConnectionEventListener> listeners) {
+    public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference, List<MyConnectionEventListener> listeners) {
         this.myDriverReference = myDriverReference;
-        this.myConnectionOpener = myConnectionOpener;
         this.listeners = listeners;
     }
 
     @Override
     public void run() {
         while (true) {
+            if (closed) {
+                return;
+            }
             final MyDriverAdapter myDriverAdapter = myDriverReference.get();
             if (myDriverAdapter == null) {
                 continue;
@@ -123,7 +122,6 @@ public class MyConnectionReceiver implements Runnable {
         for (MyConnectionEventListener listener : listeners) {
             listener.disconnected(new EventObject(myDriverAdapter));
         }
-        threadFactory.newThread(myConnectionOpener).start();
     }
 
     public boolean isQueryIdAdded() {
@@ -142,7 +140,11 @@ public class MyConnectionReceiver implements Runnable {
         return mySubscriberMap;
     }
 
-    public void setThreadFactory(ThreadFactory threadFactory) {
-        this.threadFactory = threadFactory;
+    public void close() {
+        closed = true;
+    }
+
+    public boolean isClosed() {
+        return closed;
     }
 }

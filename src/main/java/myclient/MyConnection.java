@@ -6,7 +6,6 @@ import myclient.factory.MyConnectionReceiverFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.EventObject;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -19,7 +18,6 @@ public class MyConnection {
     private final ThreadFactory threadFactory;
     private final MyConnectionReceiver myConnectionReceiver;
     private final MyConnectionOpener myConnectionOpener;
-    private final AtomicReference<MyDriverAdapter> myDriverReference;
     private final List<MyConnectionEventListener> listeners;
 
     public MyConnection(String[] uris) {
@@ -28,11 +26,10 @@ public class MyConnection {
 
     public MyConnection(String[] uris, MyConnectionOpenerFactory myConnectionOpenerFactory, final AtomicReference<MyDriverAdapter> myDriverReference, MyConnectionReceiverFactory myConnectionReceiverFactory, ThreadFactory threadFactory, List<MyConnectionEventListener> listeners) {
         this.threadFactory = threadFactory;
-        this.myDriverReference = myDriverReference;
         listeners.add(new DefaultConnectionEventListener(myDriverReference));
         this.listeners = listeners;
         myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(uris, RECONNECT_INTERVAL, listeners);
-        myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener, listeners);
+        myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, listeners);
         threadFactory.newThread(myConnectionReceiver).start();
     }
 
@@ -51,11 +48,8 @@ public class MyConnection {
     }
 
     public void close() {
-        MyDriverAdapter myDriverAdapter = myDriverReference.get();
-
-        for (MyConnectionEventListener listener : listeners) {
-            listener.disconnected(new EventObject(myDriverAdapter));
-        }
+        myConnectionReceiver.close();
+        myConnectionOpener.close();
     }
 
     public synchronized void addConnectionListener(MyConnectionEventListener listener) {

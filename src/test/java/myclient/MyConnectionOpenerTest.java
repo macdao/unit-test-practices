@@ -7,10 +7,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 
 import java.util.EventObject;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -38,6 +42,13 @@ public class MyConnectionOpenerTest {
         myConnectionOpener = new MyConnectionOpener(new String[]{uri1, uri2}, reconnectInterval, ImmutableList.of(listener));
         myConnectionOpener.setMyDriverFactory(myDriverFactory);
         myConnectionOpener.setCommonUtility(commonUtility);
+        doAnswer(new Answer() {
+            @Override
+            public Object answer(InvocationOnMock invocation) throws Throwable {
+                myConnectionOpener.close();
+                return null;  //To change body of implemented methods use File | Settings | File Templates.
+            }
+        }).when(listener).connected(any(EventObject.class));
     }
 
     @Test
@@ -72,5 +83,13 @@ public class MyConnectionOpenerTest {
         verify(commonUtility).threadSleep(reconnectInterval);
         verify(listener).connectionFailed(any(EventObject.class));
         verify(listener).connected(any(EventObject.class));
+    }
+
+    @Test
+    public void testClose() throws Exception {
+
+        myConnectionOpener.close();
+
+        assertThat(myConnectionOpener.isClosed(), is(true));
     }
 }

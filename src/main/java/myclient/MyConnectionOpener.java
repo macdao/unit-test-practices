@@ -12,6 +12,7 @@ public class MyConnectionOpener implements Runnable {
     private MyDriverFactory myDriverFactory;
     private CommonUtility commonUtility;
     private final List<MyConnectionEventListener> listeners;
+    private boolean closed;
 
     public MyConnectionOpener(String[] uris, int reconnectInterval, List<MyConnectionEventListener> listeners) {
         this.uris = uris;
@@ -23,6 +24,9 @@ public class MyConnectionOpener implements Runnable {
     public void run() {
         int i = 0;
         while (true) {
+            if(closed){
+                return;
+            }
             if (i == uris.length) {
                 i = 0;
             }
@@ -50,5 +54,13 @@ public class MyConnectionOpener implements Runnable {
 
     public void setCommonUtility(CommonUtility commonUtility) {
         this.commonUtility = commonUtility;
+    }
+
+    public void close() {
+        closed = true;
+    }
+
+    public boolean isClosed() {
+        return closed;
     }
 }

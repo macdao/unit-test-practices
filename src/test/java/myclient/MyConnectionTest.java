@@ -10,14 +10,12 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.io.Closeable;
-import java.util.EventObject;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.hamcrest.CoreMatchers.nullValue;
-import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
 public class MyConnectionTest {
@@ -58,7 +56,7 @@ public class MyConnectionTest {
         when(myConnectionOpenerFactory.newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, listeners)).thenReturn(myConnectionOpener);
         when(threadFactory.newThread(myConnectionOpener)).thenReturn(openerThread);
         when(threadFactory.newThread(myConnectionReceiver)).thenReturn(receiverThread);
-        when(myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, myConnectionOpener, listeners)).thenReturn(myConnectionReceiver);
+        when(myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, listeners)).thenReturn(myConnectionReceiver);
 
         myConnection = new MyConnection(uris, myConnectionOpenerFactory, myDriverReference, myConnectionReceiverFactory, threadFactory, listeners);
         queryId = 123;
@@ -79,7 +77,7 @@ public class MyConnectionTest {
 
         verify(threadFactory).newThread(myConnectionReceiver);
         verify(receiverThread).start();
-        verify(myConnectionReceiverFactory).newMyConnectionReceiver(myDriverReference, myConnectionOpener, listeners);
+        verify(myConnectionReceiverFactory).newMyConnectionReceiver(myDriverReference, listeners);
         verify(myConnectionReceiver).addSubscriber(queryId, mySubscriber);
 
         //该方法返回一个IDisposable对象，Dispose后即取消订阅，subscriber不会继续收到数据。
@@ -95,17 +93,9 @@ public class MyConnectionTest {
      */
     @Test
     public void testClose() throws Exception {
-        MyDriverAdapter myDriverAdapter = mock(MyDriverAdapter.class);
-        myDriverReference.set(myDriverAdapter);
-        myConnection.subscribe(queryId, mySubscriber);
-
         myConnection.close();
 
-        verify(myDriverAdapter).close();
-        assertThat(myDriverReference.get(), nullValue());
-
-        myConnection.subscribe(queryId, mySubscriber);
-        verify(myConnectionReceiver, times(2)).addSubscriber(queryId, mySubscriber);
-        verify(listener).disconnected(any(EventObject.class));
+        verify(myConnectionReceiver).close();
+        verify(myConnectionOpener).close();
     }
 }

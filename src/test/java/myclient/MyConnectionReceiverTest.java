@@ -12,7 +12,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 import org.mockito.stubbing.Answer;
 
 import java.util.EventObject;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -32,22 +31,21 @@ public class MyConnectionReceiverTest {
     @Mock
     MyDriverAdapter myDriver;
     @Mock
-    Thread thread;
-    @Mock
-    ThreadFactory threadFactory;
-    @Mock
-    MyConnectionOpener myConnectionOpener;
-    @Mock
     MyConnectionEventListener listener;
 
     @Before
     public void setUp() throws Exception {
         myDriverReference = new AtomicReference<MyDriverAdapter>();
         queryId = 123;
-        myConnectionReceiver = new MyConnectionReceiver(myDriverReference, myConnectionOpener, ImmutableList.of(new DefaultConnectionEventListener(myDriverReference), listener));
-        myConnectionReceiver.setThreadFactory(threadFactory);
+        myConnectionReceiver = new MyConnectionReceiver(myDriverReference, ImmutableList.of(new DefaultConnectionEventListener(myDriverReference), listener));
 
-        when(threadFactory.newThread(any(Runnable.class))).thenReturn(thread);
+        doAnswer(new Answer() {
+            @Override
+            public Object answer(InvocationOnMock invocation) throws Throwable {
+                myConnectionReceiver.close();
+                return null;
+            }
+        }).when(listener).disconnected(any(EventObject.class));
     }
 
     @Test
@@ -93,25 +91,15 @@ public class MyConnectionReceiverTest {
         myDriverReference.set(myDriver);
         final MyDriverAdapter myDriverAdapter2 = mock(MyDriverAdapter.class);
         doThrow(new MyDriverException("Error occurred when add query.")).when(myDriver).addQuery(queryId);
-        doAnswer(new Answer<Void>(
 
-        ) {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                myDriverReference.set(myDriverAdapter2);
-                return null;
-            }
-        }).when(thread).start();
         when(myDriverAdapter2.receive()).thenReturn(null);
         myConnectionReceiver.setQueryIdAdded(true);
         myConnectionReceiver.getMySubscriberMap().put(queryId, mySubscriber);
 
         myConnectionReceiver.run();
-        
+
         verify(myDriver).addQuery(queryId);
         verify(myDriver).close();
-        verify(threadFactory).newThread(myConnectionOpener);
-        verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
         verifyNoMoreInteractions(myDriver);
         verify(listener).disconnected(any(EventObject.class));
@@ -130,21 +118,20 @@ public class MyConnectionReceiverTest {
         when(myDriver.receive()).thenThrow(new MyDriverException("Error occurred when receive."));
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
 
-        new Thread(myConnectionReceiver).start();
-        Thread.sleep(10);
+        myConnectionReceiver.run();
 
         verify(myDriver).receive();
         verify(myDriver).close();
         assertThat(myDriverReference.get(), nullValue());
-        verify(threadFactory).newThread(myConnectionOpener);
-        verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
 
+        /*
         final MyDriverAdapter myDriverAdapter2 = mock(MyDriverAdapter.class);
         myDriverReference.set(myDriverAdapter2);
         Thread.sleep(10);
         verify(myDriverAdapter2).receive();
         verify(listener).disconnected(any(EventObject.class));
+        */
     }
 
     @Test
@@ -209,19 +196,16 @@ public class MyConnectionReceiverTest {
         doThrow(new MyDriverException("Error occurred when receive query.")).when(myDriver).removeQuery(queryId);
         myConnectionReceiver.addSubscriber(queryId, mySubscriber);
 
-        new Thread(myConnectionReceiver).start();
-        Thread.sleep(10);
+        myConnectionReceiver.run();
 
         verify(mySubscriber).onBegin();
 
         verifyNoMoreInteractions(mySubscriber);
 
         verify(myDriver).removeQuery(queryId);
-        verify(threadFactory).newThread(myConnectionOpener);
-        verify(thread).start();
         verifyNoMoreInteractions(mySubscriber);
         verify(listener).disconnected(any(EventObject.class));
-        assertThat(myConnectionReceiver.isQueryIdAdded(),is(true));
+        assertThat(myConnectionReceiver.isQueryIdAdded(), is(true));
     }
 
     /**
@@ -264,5 +248,12 @@ public class MyConnectionReceiverTest {
 
         assertThat(myConnectionReceiver.getToBeRemovedQueryIds().contains(queryId), is(true));
         verify(myDriver, never()).removeQuery(queryId);
+    }
+
+    @Test
+    public void testClose() throws Exception {
+        myConnectionReceiver.close();
+
+        assertThat(myConnectionReceiver.isClosed(), is(true));
     }
 }
