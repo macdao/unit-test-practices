@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MyConnectionReceiverFactory {
-    public MyConnectionReceiver newMyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference, List<MyConnectionEventListener> listeners) {
-        return new MyConnectionReceiver(myDriverReference, listeners);
+    public MyConnectionReceiver newMyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference) {
+        return new MyConnectionReceiver(myDriverReference);
     }
 }

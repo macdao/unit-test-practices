@@ -1,8 +1,6 @@
 package myclient;
 
-import com.google.common.collect.Lists;
-import myclient.factory.MyConnectionOpenerFactory;
-import myclient.factory.MyConnectionReceiverFactory;
+import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -10,10 +8,9 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.io.Closeable;
-import java.util.List;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicReference;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,65 +21,44 @@ public class MyConnectionTest {
     @Mock
     MySubscriber mySubscriber;
 
-    private AtomicReference<MyDriverAdapter> myDriverReference;
-
     @Mock
-    MyConnectionReceiver myConnectionReceiver;
-
-    @Mock
-    MyConnectionOpener myConnectionOpener;
-    @Mock
-    Thread receiverThread;
-    @Mock
-    Thread openerThread;
-    @Mock
-    ThreadFactory threadFactory;
-    @Mock
-    MyConnectionOpenerFactory myConnectionOpenerFactory;
-    @Mock
-    MyConnectionReceiverFactory myConnectionReceiverFactory;
-    @Mock
-    MyConnectionEventListener listener;
+    MyConnectionFactory myConnectionFactory;
     private int queryId;
-    private List<MyConnectionEventListener> listeners;
-
+    @Mock
+    MyConnectionInterface myConnectionInterface;
+    @Mock Closeable closeable;
 
     @Before
     public void setUp() throws Exception {
-        myDriverReference = new AtomicReference<MyDriverAdapter>();
-        uris = new String[]{};
-        listeners = Lists.newArrayList(listener);
+        uris = new String[]{"a", "b"};
+        when(myConnectionFactory.newMyConnection()).thenReturn(myConnectionInterface);
+        when(myConnectionInterface.subscribe(queryId,mySubscriber)).thenReturn(closeable);
 
-        when(myConnectionOpenerFactory.newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, listeners)).thenReturn(myConnectionOpener);
-        when(threadFactory.newThread(myConnectionOpener)).thenReturn(openerThread);
-        when(threadFactory.newThread(myConnectionReceiver)).thenReturn(receiverThread);
-        when(myConnectionReceiverFactory.newMyConnectionReceiver(myDriverReference, listeners)).thenReturn(myConnectionReceiver);
-
-        myConnection = new MyConnection(uris, myConnectionOpenerFactory, myDriverReference, myConnectionReceiverFactory, threadFactory, listeners);
+        myConnection = new MyConnection(uris, myConnectionFactory);
         queryId = 123;
+    }
+
+    @Test
+    public void testNew() throws Exception {
+        verify(myConnectionFactory).newMyConnection();
     }
 
     @Test
     public void testOpen() throws Exception {
         myConnection.open();
 
-        verify(myConnectionOpenerFactory).newMyConnectionOpener(uris, MyConnection.RECONNECT_INTERVAL, listeners);
-        verify(threadFactory).newThread(myConnectionOpener);
-        verify(openerThread).start();
+        verify(myConnectionInterface).open();
     }
 
     @Test
     public void testSubscribe() throws Exception {
         Closeable closeable = myConnection.subscribe(queryId, mySubscriber);
 
-        verify(threadFactory).newThread(myConnectionReceiver);
-        verify(receiverThread).start();
-        verify(myConnectionReceiverFactory).newMyConnectionReceiver(myDriverReference, listeners);
-        verify(myConnectionReceiver).addSubscriber(queryId, mySubscriber);
+        verify(myConnectionInterface).subscribe(queryId, mySubscriber);
+        
+        assertThat(closeable, is(closeable));
 
-        //该方法返回一个IDisposable对象，Dispose后即取消订阅，subscriber不会继续收到数据。
-        closeable.close();
-        verify(myConnectionReceiver).removeSubscriber(queryId);
+
     }
 
     /**
@@ -95,7 +71,6 @@ public class MyConnectionTest {
     public void testClose() throws Exception {
         myConnection.close();
 
-        verify(myConnectionReceiver).close();
-        verify(myConnectionOpener).close();
+        verify(myConnectionInterface).close();
     }
 }

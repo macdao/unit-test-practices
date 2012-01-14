@@ -1,5 +1,6 @@
 package myclient;
 
+import com.google.common.collect.Lists;
 import mydriver.MyData;
 import mydriver.MyDriverException;
 
@@ -11,12 +12,11 @@ public class MyConnectionReceiver implements Runnable {
     private final Map<Integer, MySubscriber> mySubscriberMap = new HashMap<Integer, MySubscriber>();
     private boolean queryIdAdded;
     private final Set<Integer> toBeRemovedQueryIds = new HashSet<Integer>();
-    private final List<MyConnectionEventListener> listeners;
+    private final List<MyConnectionEventListener> listeners = Lists.newArrayList();
     private boolean closed;
 
-    public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference, List<MyConnectionEventListener> listeners) {
+    public MyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference) {
         this.myDriverReference = myDriverReference;
-        this.listeners = listeners;
     }
 
     @Override
@@ -146,5 +146,13 @@ public class MyConnectionReceiver implements Runnable {
 
     public boolean isClosed() {
         return closed;
+    }
+
+    public void addConnectionListener(MyConnectionEventListener listener) {
+        //To change body of created methods use File | Settings | File Templates.
+    }
+
+    public void removeConnectionListener(MyConnectionEventListener listener) {
+        //To change body of created methods use File | Settings | File Templates.
     }
 }

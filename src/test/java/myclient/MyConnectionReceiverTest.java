@@ -37,7 +37,7 @@ public class MyConnectionReceiverTest {
     public void setUp() throws Exception {
         myDriverReference = new AtomicReference<MyDriverAdapter>();
         queryId = 123;
-        myConnectionReceiver = new MyConnectionReceiver(myDriverReference, ImmutableList.of(new DefaultConnectionEventListener(myDriverReference), listener));
+        myConnectionReceiver = new MyConnectionReceiver(myDriverReference);
 
         doAnswer(new Answer() {
             @Override
