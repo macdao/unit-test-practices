@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.io.Closeable;
+import java.util.ArrayList;
 import java.util.EventObject;
 import java.util.List;
 
@@ -40,6 +41,7 @@ public class MySyncConnectionTest {
     private int queryId;
     @Mock
     MySubscriber mySubscriber;
+    private ArrayList<MyConnectionEventListener> listeners;
 
     @Before
     public void setUp() throws Exception {
@@ -50,7 +52,8 @@ public class MySyncConnectionTest {
         when(myDriverFactory.newMyDriver(uri1)).thenReturn(myDriver1);
         when(myDriverFactory.newMyDriver(uri2)).thenReturn(myDriver2);
 
-        mySyncConnection = new MySyncConnection(uris, myDriverFactory, reconnectInterval, commonUtility, Lists.newArrayList(listener));
+        listeners = Lists.newArrayList(listener);
+        mySyncConnection = new MySyncConnection(uris, myDriverFactory, reconnectInterval, commonUtility, listeners);
     }
 
     @Test
@@ -92,13 +95,13 @@ public class MySyncConnectionTest {
 
         mySyncConnection.open();
 
-        verify(myDriverFactory,times(2)).newMyDriver(uri1);
-        verify(myDriver1,times(2)).connect();
+        verify(myDriverFactory, times(2)).newMyDriver(uri1);
+        verify(myDriver1, times(2)).connect();
         verify(myDriverFactory).newMyDriver(uri2);
         verify(myDriver2).connect();
-        verify(commonUtility,times(2)).threadSleep(reconnectInterval);
+        verify(commonUtility, times(2)).threadSleep(reconnectInterval);
         ArgumentCaptor<EventObject> argument1 = ArgumentCaptor.forClass(EventObject.class);
-        verify(listener,times(2)).connectionFailed(argument1.capture());
+        verify(listener, times(2)).connectionFailed(argument1.capture());
         List<EventObject> allValues = argument1.getAllValues();
         assertThat((MyDriverAdapter) allValues.get(0).getSource(), is(myDriver1));
         assertThat((MyDriverAdapter) allValues.get(1).getSource(), is(myDriver2));
@@ -140,7 +143,7 @@ public class MySyncConnectionTest {
         assertThat(mySyncConnection.getMySubscribers().isEmpty(), is(true));
         ArgumentCaptor<EventObject> argument = ArgumentCaptor.forClass(EventObject.class);
         verify(listener).disconnected(argument.capture());
-        assertThat((MyDriverAdapter) argument.getValue().getSource(),is(myDriver1));
+        assertThat((MyDriverAdapter) argument.getValue().getSource(), is(myDriver1));
     }
 
     @Test
@@ -164,7 +167,7 @@ public class MySyncConnectionTest {
         assertThat(mySyncConnection.getMySubscribers().get(queryId), is(mySubscriber));
         ArgumentCaptor<EventObject> argument = ArgumentCaptor.forClass(EventObject.class);
         verify(listener).disconnected(argument.capture());
-        assertThat((MyDriverAdapter) argument.getValue().getSource(),is(myDriver1));
+        assertThat((MyDriverAdapter) argument.getValue().getSource(), is(myDriver1));
     }
 
     @Test
@@ -172,9 +175,9 @@ public class MySyncConnectionTest {
         mySyncConnection.open();
 
         mySyncConnection.close();
-        
+
         verify(myDriver1).close();
-        assertThat(mySyncConnection.getMyDriverAdapter(),nullValue());
+        assertThat(mySyncConnection.getMyDriverAdapter(), nullValue());
         ArgumentCaptor<EventObject> argument = ArgumentCaptor.forClass(EventObject.class);
         verify(listener).disconnected(argument.capture());
         assertThat((MyDriverAdapter) argument.getValue().getSource(), is(myDriver1));
@@ -182,11 +185,17 @@ public class MySyncConnectionTest {
 
     @Test
     public void testAddConnectionListener() throws Exception {
-//mySyncConnection.addConnectionListener();
+        MyConnectionEventListener mock = mock(MyConnectionEventListener.class);
+
+        mySyncConnection.addConnectionListener(mock);
+
+        assertThat(listeners.contains(mock), is(true));
     }
 
     @Test
     public void testRemoveConnectionListener() throws Exception {
+        mySyncConnection.removeConnectionListener(listener);
 
+        assertThat(listeners.contains(listener), is(false));
     }
 }

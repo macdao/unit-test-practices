@@ -87,12 +87,12 @@ public class MySyncConnection implements MyConnectionInterface, MyConnectionEven
 
     @Override
     public void addConnectionListener(MyConnectionEventListener listener) {
-        //To change body of implemented methods use File | Settings | File Templates.
+        listeners.add(listener);
     }
 
     @Override
     public void removeConnectionListener(MyConnectionEventListener listener) {
-        //To change body of implemented methods use File | Settings | File Templates.
+        listeners.remove(listener);
     }
 
     @Override
