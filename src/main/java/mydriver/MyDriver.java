@@ -13,7 +13,8 @@ public final class MyDriver {
     private Set<Integer> _queryIds = new HashSet<Integer>();
     private BlockingQueue<MyData> _dataQueue = new LinkedBlockingQueue<MyData>();
     private AtomicBoolean _isClosed = new AtomicBoolean(false);
-    
+    private final double rate;
+
     public MyDriver(String uri) {
         new Thread(new Runnable() {
             
@@ -23,16 +24,17 @@ public final class MyDriver {
             }
             
         }).start();
+        rate = 0.01;
     }
     
     public void connect() throws MyDriverException {
-    	if (Math.random() < 0.01) {
+    	if (Math.random() < rate) {
             throw new MyDriverException("Error occurred when connect.");
         }
     }
     
     public void addQuery(int id) throws MyDriverException {
-        if (Math.random() < 0.01) {
+        if (Math.random() < rate) {
             throw new MyDriverException("Error occurred when add query.");
         }
         
@@ -44,7 +46,7 @@ public final class MyDriver {
     }
     
     public void removeQuery(int id) throws MyDriverException {
-        if (Math.random() < 0.01) {
+        if (Math.random() < rate) {
             throw new MyDriverException("Error occurred when receive query.");
         }
         
@@ -81,7 +83,7 @@ public final class MyDriver {
         
         if (this._isClosed.get()) return null;
 
-        if (Math.random() < 0.01) {
+        if (Math.random() < rate) {
             throw new MyDriverException("Error occurred when receive.");
         }
 

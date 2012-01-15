@@ -1,84 +1,67 @@
 package myclient;
 
-import myclient.factory.MyDriverFactory;
+import myclient.factory.*;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
-public class MyConnection implements MyConnectionInterface, Runnable {
+public class MyConnection implements MyConnectionInterface {
 
     public final static int RECONNECT_INTERVAL = 3000;
 
-    private final MyConnectionInterface myConnection;
-
-    private final Map<Integer, MySubscriber> mySubscriberMap;
+    private final MySyncConnection mySyncConnection;
 
     private final ThreadFactory threadFactory;
 
-    private boolean opened;
-
-    private final List<MyConnectionEventListener> listeners;
+    private final MyConnectionOpener myConnectionOpener;
+    private final MyConnectionReceiver myConnectionReceiver;
+    private final MyRunnable openerRunner;
+    private final MyRunnable receiverRunner;
 
     public MyConnection(String[] uris) {
-        this(uris, new MyConnectionFactory(), new HashMap<Integer, MySubscriber>(), Executors.defaultThreadFactory(), new ArrayList<MyConnectionEventListener>(), new MyDriverFactory(), new CommonUtility());
+        this(uris, new MySyncConnectionFactory(), new HashMap<Integer, MySubscriber>(), Executors.defaultThreadFactory(), new MyDriverFactory(), new CommonUtility(), new MyConnectionOpenerFactory(), new MyConnectionReceiverFactory(), new MyRunnableFactory());
     }
 
-    public MyConnection(String[] uris, MyConnectionFactory myConnectionFactory, Map<Integer, MySubscriber> mySubscriberMap, ThreadFactory threadFactory, List<MyConnectionEventListener> listeners, MyDriverFactory myDriverFactory, CommonUtility commonUtility) {
-        myConnection = myConnectionFactory.newMyConnection(uris, myDriverFactory, RECONNECT_INTERVAL, commonUtility, listeners);
-        this.mySubscriberMap = mySubscriberMap;
+    public MyConnection(String[] uris, MySyncConnectionFactory mySyncConnectionFactory, Map<Integer, MySubscriber> mySubscriberMap, ThreadFactory threadFactory, MyDriverFactory myDriverFactory, CommonUtility commonUtility, MyConnectionOpenerFactory myConnectionOpenerFactory, MyConnectionReceiverFactory myConnectionReceiverFactory, MyRunnableFactory myRunnableFactory) {
+        mySyncConnection = mySyncConnectionFactory.newMySyncConnection(uris, myDriverFactory, mySubscriberMap);
         this.threadFactory = threadFactory;
-        this.listeners = listeners;
+        myConnectionOpener = myConnectionOpenerFactory.newMyConnectionOpener(mySyncConnection, commonUtility, RECONNECT_INTERVAL, mySubscriberMap);
+        myConnectionReceiver = myConnectionReceiverFactory.newMyConnectionReceiver(mySyncConnection);
+        openerRunner = myRunnableFactory.newMyRunnable(myConnectionOpener);
+        receiverRunner = myRunnableFactory.newMyRunnable(myConnectionReceiver);
     }
 
     public void open() {
-        opened = true;
-        threadFactory.newThread(this).start();
+        myConnectionOpener.setOpened(true);
+        myConnectionReceiver.setOpened(true);
+        threadFactory.newThread(openerRunner).start();
+        threadFactory.newThread(receiverRunner).start();
     }
 
     public Closeable subscribe(final int queryId, MySubscriber subscriber) {
-        mySubscriberMap.put(queryId, subscriber);
+        myConnectionOpener.addSubscribe(queryId, subscriber);
         return new Closeable() {
             @Override
             public void close() throws IOException {
-                mySubscriberMap.remove(queryId);
+                myConnectionOpener.removeSubscribe(queryId);
             }
         };
     }
 
     public void close() {
-        opened = false;
+        myConnectionOpener.setOpened(false);
+        myConnectionReceiver.setOpened(false);
     }
 
     public synchronized void addConnectionListener(MyConnectionEventListener listener) {
-        listeners.add(listener);
+        mySyncConnection.addConnectionListener(listener);
     }
 
     public synchronized void removeConnectionListener(MyConnectionEventListener listener) {
-        listeners.remove(listener);
-    }
-
-    public boolean isOpened() {
-        return opened;
-    }
-
-    @Override
-    public void run() {
-        while (true) {
-            boolean oneLoop = oneLoop();
-            if (!oneLoop) {
-                return;
-            }
-        }
-    }
-
-    private boolean oneLoop() {
-        //todo
-        return false;  //To change body of created methods use File | Settings | File Templates.
+        mySyncConnection.removeConnectionListener(listener);
     }
 }

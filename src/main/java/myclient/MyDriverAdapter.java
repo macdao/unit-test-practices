@@ -28,7 +28,6 @@ public class MyDriverAdapter {
         myDriver.close();
     }
 
-
     public MyData receive() throws MyDriverException {
         return myDriver.receive();
     }

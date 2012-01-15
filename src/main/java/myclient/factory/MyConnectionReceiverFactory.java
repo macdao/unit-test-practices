@@ -1,14 +1,10 @@
 package myclient.factory;
 
-import myclient.MyConnectionEventListener;
 import myclient.MyConnectionReceiver;
-import myclient.MyDriverAdapter;
-
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import myclient.MySyncConnection;
 
 public class MyConnectionReceiverFactory {
-    public MyConnectionReceiver newMyConnectionReceiver(AtomicReference<MyDriverAdapter> myDriverReference) {
-        return new MyConnectionReceiver(myDriverReference);
+    public MyConnectionReceiver newMyConnectionReceiver(MySyncConnection mySyncConnection) {
+        return new MyConnectionReceiver(mySyncConnection);
     }
 }

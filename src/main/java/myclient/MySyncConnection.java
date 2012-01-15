@@ -1,8 +1,11 @@
 package myclient;
 
-import com.google.common.collect.Maps;
+import com.google.common.collect.Lists;
 import myclient.factory.MyDriverFactory;
+import mydriver.MyData;
 import mydriver.MyDriverException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -13,75 +16,126 @@ import java.util.Map;
 public class MySyncConnection implements MyConnectionInterface, MyConnectionEventListener {
     private final String[] uris;
     private final MyDriverFactory myDriverFactory;
-    private final int reconnectInterval;
-    private final CommonUtility commonUtility;
     private final List<MyConnectionEventListener> listeners;
-    private final Map<Integer, MySubscriber> mySubscribers = Maps.newHashMap();
+    private final Map<Integer, MySubscriber> mySubscriberMap;
     private MyDriverAdapter myDriverAdapter;
+    private int urisIndex;
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    public MySyncConnection(String[] uris, MyDriverFactory myDriverFactory, int reconnectInterval, CommonUtility commonUtility, List<MyConnectionEventListener> listeners) {
+    public MySyncConnection(String[] uris, MyDriverFactory myDriverFactory, Map<Integer, MySubscriber> mySubscriberMap) {
         this.uris = uris;
         this.myDriverFactory = myDriverFactory;
-        this.reconnectInterval = reconnectInterval;
-        this.commonUtility = commonUtility;
+        listeners = Lists.newArrayList();
         listeners.add(this);
-        this.listeners = listeners;
+        this.mySubscriberMap = mySubscriberMap;
     }
 
     @Override
-    public void open() {
-        int i = 0;
-        while (true) {
-            if (i == uris.length) {
-                i = 0;
-            }
-
-            String uri = uris[i++];
-            MyDriverAdapter myDriver = myDriverFactory.newMyDriver(uri);
-            try {
-                myDriver.connect();
-                for (MyConnectionEventListener listener : listeners) {
-                    listener.connected(new EventObject(myDriver));
-                }
-                return;
-            } catch (MyDriverException e) {
-                for (MyConnectionEventListener listener : listeners) {
-                    listener.connectionFailed(new EventObject(myDriver));
-                }
-            }
-            commonUtility.threadSleep(reconnectInterval);
+    public void open() throws MyDriverException {
+        if (myDriverAdapter != null) {
+            return;
         }
-    }
 
-    @Override
-    public Closeable subscribe(final int queryId, MySubscriber subscriber) {
+        if (urisIndex == uris.length) {
+            urisIndex = 0;
+        }
+
+        String uri = uris[urisIndex++];
+        MyDriverAdapter myDriver = myDriverFactory.newMyDriver(uri);
         try {
-            myDriverAdapter.addQuery(queryId);
+            myDriver.connect();
+            for (MyConnectionEventListener listener : listeners) {
+                listener.connected(new EventObject(myDriver));
+            }
         } catch (MyDriverException e) {
-            handleTransferException(myDriverAdapter, e);
+            for (MyConnectionEventListener listener : listeners) {
+                listener.connectionFailed(new EventObject(myDriver));
+            }
+            throw e;
         }
-        mySubscribers.put(queryId, subscriber);
+    }
+
+    @Override
+    public Closeable subscribe(final int queryId, MySubscriber subscriber) throws MyDriverException {
+        final MyDriverAdapter driver = myDriverAdapter;
+        if (driver == null) {
+            return new Closeable() {
+
+                @Override
+                public void close() throws IOException {
+
+                }
+            };
+        }
+
+        try {
+            driver.addQuery(queryId);
+        } catch (MyDriverException e) {
+            handleTransferException(driver);
+            throw e;
+        }
+        mySubscriberMap.put(queryId, subscriber);
         return new Closeable() {
             @Override
             public void close() throws IOException {
-                cancelSubscribe(queryId);
+                try {
+                    cancelSubscribe(queryId);
+                } catch (MyDriverException e) {
+                    throw new IOException(e);
+                }
             }
         };
     }
 
-    private void cancelSubscribe(int queryId) {
-        try {
-            myDriverAdapter.removeQuery(queryId);
-        } catch (MyDriverException e) {
-            handleTransferException(myDriverAdapter, e);
+    public void cancelSubscribe(int queryId) throws MyDriverException {
+        final MyDriverAdapter driver = myDriverAdapter;
+        if (driver == null) {
+            return;
         }
-        mySubscribers.remove(queryId);
+
+        try {
+            driver.removeQuery(queryId);
+        } catch (MyDriverException e) {
+            handleTransferException(driver);
+            throw e;
+        }
+        mySubscriberMap.remove(queryId);
     }
 
     @Override
     public void close() {
-        for (MyConnectionEventListener listener : listeners) {
-            listener.disconnected(new EventObject(myDriverAdapter));
+        MyDriverAdapter driver = myDriverAdapter;
+        if (driver != null) {
+            for (MyConnectionEventListener listener : listeners) {
+                listener.disconnected(new EventObject(driver));
+            }
+        }
+    }
+
+    public void receive() throws MyDriverException {
+        final MyDriverAdapter driver = myDriverAdapter;
+        if (driver == null) {
+            return;
+        }
+
+        final MyData myData;
+        try {
+            myData = driver.receive();
+            logger.info("Received {}", myData);
+        } catch (MyDriverException e) {
+            handleTransferException(driver);
+            throw e;
+        }
+
+        if (myData != null) {
+            if (mySubscriberMap.containsKey(myData.queryId)) {
+                MySubscriber mySubscriber = mySubscriberMap.get(myData.queryId);
+                if ("begin".equals(myData.value)) {
+                    mySubscriber.onBegin();
+                } else {
+                    mySubscriber.onMessage(myData.value);
+                }
+            }
         }
     }
 
@@ -106,22 +160,18 @@ public class MySyncConnection implements MyConnectionInterface, MyConnectionEven
 
     @Override
     public void disconnected(EventObject event) {
+        mySubscriberMap.clear();
         myDriverAdapter.close();
         myDriverAdapter = null;
-    }
-
-    public Map<Integer, MySubscriber> getMySubscribers() {
-        return mySubscribers;
     }
 
     public MyDriverAdapter getMyDriverAdapter() {
         return myDriverAdapter;
     }
 
-    private void handleTransferException(MyDriverAdapter myDriverAdapter, MyDriverException e) {
+    private void handleTransferException(MyDriverAdapter myDriverAdapter) {
         for (MyConnectionEventListener listener : listeners) {
             listener.disconnected(new EventObject(myDriverAdapter));
         }
-        throw new RuntimeException(e);
     }
 }

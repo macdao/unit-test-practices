@@ -1,6 +1,5 @@
 package myclient;
 
-import com.google.common.collect.Lists;
 import myclient.factory.MyDriverFactory;
 import mydriver.MyDriverException;
 import org.junit.Before;
@@ -11,9 +10,8 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.io.Closeable;
-import java.util.ArrayList;
-import java.util.EventObject;
-import java.util.List;
+import java.io.IOException;
+import java.util.*;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
@@ -25,11 +23,8 @@ import static org.mockito.Mockito.*;
 public class MySyncConnectionTest {
 
     private MySyncConnection mySyncConnection;
-    private int reconnectInterval = 10;
     private String uri1;
     private String uri2;
-    @Mock
-    CommonUtility commonUtility;
     @Mock
     MyDriverFactory myDriverFactory;
     @Mock
@@ -41,10 +36,11 @@ public class MySyncConnectionTest {
     private int queryId;
     @Mock
     MySubscriber mySubscriber;
-    private ArrayList<MyConnectionEventListener> listeners;
+    private Map<Integer, MySubscriber> mySubscriberMap;
 
     @Before
     public void setUp() throws Exception {
+        mySubscriberMap = new HashMap<Integer, MySubscriber>();
         queryId = 123;
         uri1 = "a";
         uri2 = "b";
@@ -52,8 +48,8 @@ public class MySyncConnectionTest {
         when(myDriverFactory.newMyDriver(uri1)).thenReturn(myDriver1);
         when(myDriverFactory.newMyDriver(uri2)).thenReturn(myDriver2);
 
-        listeners = Lists.newArrayList(listener);
-        mySyncConnection = new MySyncConnection(uris, myDriverFactory, reconnectInterval, commonUtility, listeners);
+        mySyncConnection = new MySyncConnection(uris, myDriverFactory, mySubscriberMap);
+        mySyncConnection.addConnectionListener(listener);
     }
 
     @Test
@@ -70,44 +66,65 @@ public class MySyncConnectionTest {
 
     @Test
     public void testOpen2() throws Exception {
-        doThrow(new MyDriverException("Error occurred when connect.")).when(myDriver1).connect();
+        MyDriverException exception = new MyDriverException("Error occurred when connect.");
+        doThrow(exception).when(myDriver1).connect();
 
-        mySyncConnection.open();
+        try {
+            mySyncConnection.open();
+            fail();
+        } catch (MyDriverException e) {
+            assertThat(e, is(exception));
+        }
 
         verify(myDriverFactory).newMyDriver(uri1);
         verify(myDriver1).connect();
-        verify(myDriverFactory).newMyDriver(uri2);
-        verify(myDriver2).connect();
-        verify(commonUtility).threadSleep(reconnectInterval);
+        assertThat(mySyncConnection.getMyDriverAdapter(), nullValue());
         ArgumentCaptor<EventObject> argument1 = ArgumentCaptor.forClass(EventObject.class);
         verify(listener).connectionFailed(argument1.capture());
         assertThat((MyDriverAdapter) argument1.getValue().getSource(), is(myDriver1));
-        ArgumentCaptor<EventObject> argument2 = ArgumentCaptor.forClass(EventObject.class);
-        verify(listener).connected(argument2.capture());
-        assertThat((MyDriverAdapter) argument2.getValue().getSource(), is(myDriver2));
-        assertThat(mySyncConnection.getMyDriverAdapter(), is(myDriver2));
     }
 
     @Test
     public void testOpen3() throws Exception {
-        doThrow(new MyDriverException("Error occurred when connect.")).doNothing().when(myDriver1).connect();
-        doThrow(new MyDriverException("Error occurred when connect.")).when(myDriver2).connect();
+        MyDriverException exception1 = new MyDriverException("Error occurred when connect.");
+        doThrow(exception1).doNothing().when(myDriver1).connect();
+        MyDriverException exception2 = new MyDriverException("Error occurred when connect.");
+        doThrow(exception2).when(myDriver2).connect();
+
+        try {
+            mySyncConnection.open();fail();
+        } catch (MyDriverException e) {
+            assertThat(e, is(exception1));
+        }
+
+        verify(myDriverFactory).newMyDriver(uri1);
+        verify(myDriver1).connect();
+        assertThat(mySyncConnection.getMyDriverAdapter(), nullValue());
+        ArgumentCaptor<EventObject> argument1 = ArgumentCaptor.forClass(EventObject.class);
+        verify(listener).connectionFailed(argument1.capture());
+        assertThat((MyDriverAdapter) argument1.getValue().getSource(), is(myDriver1));
+
+        try {
+            mySyncConnection.open();
+            fail();
+        } catch (MyDriverException e) {
+            assertThat(e, is(exception2));
+        }
+
+        verify(myDriverFactory).newMyDriver(uri2);
+        verify(myDriver2).connect();
+        assertThat(mySyncConnection.getMyDriverAdapter(), nullValue());
+        ArgumentCaptor<EventObject> argument2 = ArgumentCaptor.forClass(EventObject.class);
+        verify(listener, times(2)).connectionFailed(argument2.capture());
+        assertThat((MyDriverAdapter) argument2.getValue().getSource(), is(myDriver2));
 
         mySyncConnection.open();
 
         verify(myDriverFactory, times(2)).newMyDriver(uri1);
         verify(myDriver1, times(2)).connect();
-        verify(myDriverFactory).newMyDriver(uri2);
-        verify(myDriver2).connect();
-        verify(commonUtility, times(2)).threadSleep(reconnectInterval);
-        ArgumentCaptor<EventObject> argument1 = ArgumentCaptor.forClass(EventObject.class);
-        verify(listener, times(2)).connectionFailed(argument1.capture());
-        List<EventObject> allValues = argument1.getAllValues();
-        assertThat((MyDriverAdapter) allValues.get(0).getSource(), is(myDriver1));
-        assertThat((MyDriverAdapter) allValues.get(1).getSource(), is(myDriver2));
-        ArgumentCaptor<EventObject> argument2 = ArgumentCaptor.forClass(EventObject.class);
-        verify(listener).connected(argument2.capture());
-        assertThat((MyDriverAdapter) argument2.getValue().getSource(), is(myDriver1));
+        ArgumentCaptor<EventObject> argument3 = ArgumentCaptor.forClass(EventObject.class);
+        verify(listener).connected(argument3.capture());
+        assertThat((MyDriverAdapter) argument3.getValue().getSource(), is(myDriver1));
         assertThat(mySyncConnection.getMyDriverAdapter(), is(myDriver1));
     }
 
@@ -117,13 +134,13 @@ public class MySyncConnectionTest {
         final Closeable closeable = mySyncConnection.subscribe(queryId, mySubscriber);
 
         verify(myDriver1).addQuery(queryId);
-        assertThat(mySyncConnection.getMySubscribers().size(), is(1));
-        assertThat(mySyncConnection.getMySubscribers().get(queryId), is(mySubscriber));
+        assertThat(mySubscriberMap.size(), is(1));
+        assertThat(mySubscriberMap.get(queryId), is(mySubscriber));
 
         closeable.close();
 
         verify(myDriver1).removeQuery(queryId);
-        assertThat(mySyncConnection.getMySubscribers().isEmpty(), is(true));
+        assertThat(mySubscriberMap.isEmpty(), is(true));
     }
 
     @Test
@@ -135,12 +152,12 @@ public class MySyncConnectionTest {
         try {
             mySyncConnection.subscribe(queryId, mySubscriber);
             fail();
-        } catch (RuntimeException e) {
-            assertThat((MyDriverException) e.getCause(), is(exception));
+        } catch (MyDriverException e) {
+            assertThat(e, is(exception));
         }
 
         verify(myDriver1).addQuery(queryId);
-        assertThat(mySyncConnection.getMySubscribers().isEmpty(), is(true));
+        assertThat(mySubscriberMap.isEmpty(), is(true));
         ArgumentCaptor<EventObject> argument = ArgumentCaptor.forClass(EventObject.class);
         verify(listener).disconnected(argument.capture());
         assertThat((MyDriverAdapter) argument.getValue().getSource(), is(myDriver1));
@@ -154,17 +171,15 @@ public class MySyncConnectionTest {
         mySyncConnection.open();
         final Closeable closeable = mySyncConnection.subscribe(queryId, mySubscriber);
 
-
         try {
             closeable.close();
             fail();
-        } catch (RuntimeException e) {
+        } catch (IOException e) {
             assertThat((MyDriverException) e.getCause(), is(exception));
         }
 
         verify(myDriver1).removeQuery(queryId);
-        assertThat(mySyncConnection.getMySubscribers().size(), is(1));
-        assertThat(mySyncConnection.getMySubscribers().get(queryId), is(mySubscriber));
+        assertThat(mySubscriberMap.isEmpty(), is(true));
         ArgumentCaptor<EventObject> argument = ArgumentCaptor.forClass(EventObject.class);
         verify(listener).disconnected(argument.capture());
         assertThat((MyDriverAdapter) argument.getValue().getSource(), is(myDriver1));
@@ -181,21 +196,5 @@ public class MySyncConnectionTest {
         ArgumentCaptor<EventObject> argument = ArgumentCaptor.forClass(EventObject.class);
         verify(listener).disconnected(argument.capture());
         assertThat((MyDriverAdapter) argument.getValue().getSource(), is(myDriver1));
-    }
-
-    @Test
-    public void testAddConnectionListener() throws Exception {
-        MyConnectionEventListener mock = mock(MyConnectionEventListener.class);
-
-        mySyncConnection.addConnectionListener(mock);
-
-        assertThat(listeners.contains(mock), is(true));
-    }
-
-    @Test
-    public void testRemoveConnectionListener() throws Exception {
-        mySyncConnection.removeConnectionListener(listener);
-
-        assertThat(listeners.contains(listener), is(false));
     }
 }

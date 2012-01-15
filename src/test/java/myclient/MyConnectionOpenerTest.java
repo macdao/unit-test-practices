@@ -1,95 +1,151 @@
 package myclient;
 
-import com.google.common.collect.ImmutableList;
-import myclient.factory.MyDriverFactory;
 import mydriver.MyDriverException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
-import org.mockito.stubbing.Answer;
 
-import java.util.EventObject;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
 public class MyConnectionOpenerTest {
 
     private MyConnectionOpener myConnectionOpener;
-    private String uri1;
-    private String uri2;
     @Mock
-    MyDriverFactory myDriverFactory;
-    @Mock
-    MyDriverAdapter myDriver1;
+    MySyncConnection mySyncConnection;
     @Mock
     CommonUtility commonUtility;
     private int reconnectInterval;
     @Mock
-    MyConnectionEventListener listener;
+    MySubscriber mySubscriber;
+    private int queryId = 123;
+    private Map<Integer, MySubscriber> effectedMySubscriberMap;
 
     @Before
     public void setUp() throws Exception {
-        uri1 = "a";
-        uri2 = "b";
-        reconnectInterval = 100;
-
-        myConnectionOpener = new MyConnectionOpener(new String[]{uri1, uri2}, reconnectInterval, ImmutableList.of(listener));
-        myConnectionOpener.setMyDriverFactory(myDriverFactory);
-        myConnectionOpener.setCommonUtility(commonUtility);
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                myConnectionOpener.close();
-                return null;  //To change body of implemented methods use File | Settings | File Templates.
-            }
-        }).when(listener).connected(any(EventObject.class));
+        reconnectInterval = 10;
+        effectedMySubscriberMap = new HashMap<Integer, MySubscriber>();
+        myConnectionOpener = new MyConnectionOpener(mySyncConnection, commonUtility, reconnectInterval, effectedMySubscriberMap);
     }
 
     @Test
-    public void testRun() throws Exception {
-        when(myDriverFactory.newMyDriver(uri1)).thenReturn(myDriver1);
+    public void testClosed() throws Exception {
+        myConnectionOpener.setOpened(false);
 
-        myConnectionOpener.run();
+        boolean b = myConnectionOpener.oneLoop();
 
-        verify(myDriver1).connect();
-        verify(listener).connected(any(EventObject.class));
+        assertThat(b, is(false));
     }
 
-    /**
-     * 从第一个uri开始连接，如果连接失败，则尝试连接下一个uri，
-     * 如果最后一个uri也失败则重新尝试第一个uri，直至成功。
-     * 两次尝试之间都需要等待一段时间（ReconnectInterval）。
-     *
-     * @throws Exception e
-     */
     @Test
-    public void testRun2() throws Exception {
-        MyDriverAdapter myDriver2 = mock(MyDriverAdapter.class);
+    public void testConnectFailed() throws Exception {
+        myConnectionOpener.setOpened(true);
+        doThrow(new MyDriverException("Error occurred when connect.")).when(mySyncConnection).open();
 
-        when(myDriverFactory.newMyDriver(uri1)).thenReturn(myDriver1);
-        when(myDriverFactory.newMyDriver(uri2)).thenReturn(myDriver2);
-        doThrow(new MyDriverException("Error occurred when connect.")).when(myDriver1).connect();
+        boolean b = myConnectionOpener.oneLoop();
 
-        myConnectionOpener.run();
-
-        verify(myDriver1).connect();
-        verify(myDriver2).connect();
+        verify(mySyncConnection).open();
         verify(commonUtility).threadSleep(reconnectInterval);
-        verify(listener).connectionFailed(any(EventObject.class));
-        verify(listener).connected(any(EventObject.class));
+        verifyNoMoreInteractions(mySyncConnection);
+        assertThat(b, is(true));
     }
 
     @Test
-    public void testClose() throws Exception {
+    public void testConnectSuccess() throws Exception {
+        myConnectionOpener.setOpened(true);
 
-        myConnectionOpener.close();
+        boolean b = myConnectionOpener.oneLoop();
 
-        assertThat(myConnectionOpener.isClosed(), is(true));
+        verify(mySyncConnection).open();
+        assertThat(b, is(true));
+    }
+
+    @Test
+    public void testConnectedAndAddSubscribeSuccess() throws Exception {
+        myConnectionOpener.setOpened(true);
+        myConnectionOpener.addSubscribe(queryId, mySubscriber);
+
+        boolean b = myConnectionOpener.oneLoop();
+
+        verify(mySyncConnection).open();
+        verify(mySyncConnection).subscribe(queryId, mySubscriber);
+        assertThat(myConnectionOpener.getMySubscriberMap().size(), is(1));
+        assertThat(myConnectionOpener.getMySubscriberMap().get(queryId), is(mySubscriber));
+
+        assertThat(b, is(true));
+    }
+
+    @Test
+    public void testConnectedAndAddSubscribeFailed() throws Exception {
+        myConnectionOpener.setOpened(true);
+        myConnectionOpener.addSubscribe(queryId, mySubscriber);
+        doThrow(new MyDriverException("Error occurred when add query.")).when(mySyncConnection).subscribe(queryId, mySubscriber);
+
+        boolean b = myConnectionOpener.oneLoop();
+
+        verify(mySyncConnection).open();
+        verify(mySyncConnection).subscribe(queryId, mySubscriber);
+        verifyNoMoreInteractions(mySyncConnection);
+        assertThat(myConnectionOpener.getMySubscriberMap().size(), is(1));
+        assertThat(myConnectionOpener.getMySubscriberMap().get(queryId), is(mySubscriber));
+        assertThat(effectedMySubscriberMap.isEmpty(), is(true));
+
+        assertThat(b, is(true));
+    }
+
+    @Test
+    public void testConnectedAndRemoveSubscribeSuccess() throws Exception {
+        myConnectionOpener.setOpened(true);
+        effectedMySubscriberMap.put(queryId, mySubscriber);
+        myConnectionOpener.removeSubscribe(queryId);
+
+        boolean b = myConnectionOpener.oneLoop();
+
+        verify(mySyncConnection).open();
+        verify(mySyncConnection).cancelSubscribe(queryId);
+        assertThat(myConnectionOpener.getMySubscriberMap().isEmpty(), is(true));
+
+        assertThat(b, is(true));
+    }
+
+    @Test
+    public void testConnectedAndRemoveSubscribeFailed() throws Exception {
+        myConnectionOpener.setOpened(true);
+        effectedMySubscriberMap.put(queryId, mySubscriber);
+        int queryId2 = 110;
+        MySubscriber mySubscriber2 = mock(MySubscriber.class);
+        effectedMySubscriberMap.put(queryId2, mySubscriber2);
+        myConnectionOpener.addSubscribe(queryId2, mySubscriber2);
+        myConnectionOpener.removeSubscribe(queryId);
+        doThrow(new MyDriverException("Error occurred when receive query.")).when(mySyncConnection).cancelSubscribe(queryId);
+
+        boolean b = myConnectionOpener.oneLoop();
+
+        verify(mySyncConnection).open();
+        verify(mySyncConnection).cancelSubscribe(queryId);
+        verifyNoMoreInteractions(mySyncConnection);
+        assertThat(myConnectionOpener.getMySubscriberMap().size(), is(1));
+        assertThat(myConnectionOpener.getMySubscriberMap().get(queryId2), is(mySubscriber2));
+
+        assertThat(b, is(true));
+    }
+
+    @Test
+    public void testAddSubscribe() throws Exception {
+        myConnectionOpener.addSubscribe(queryId, mySubscriber);
+
+        try {
+            myConnectionOpener.addSubscribe(queryId, mySubscriber);
+            fail();
+        } catch (QueryIdDuplicateException e) {
+        }
     }
 }

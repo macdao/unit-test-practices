@@ -1,6 +1,6 @@
 package myclient;
 
-import myclient.factory.MyDriverFactory;
+import myclient.factory.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -8,13 +8,10 @@ import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 import java.io.Closeable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,60 +23,86 @@ public class MyConnectionTest {
     MySubscriber mySubscriber;
 
     @Mock
-    MyConnectionFactory myConnectionFactory;
+    MySyncConnectionFactory mySyncConnectionFactory;
     private int queryId;
     @Mock
-    MyConnectionInterface myConnectionInterface;
+    MySyncConnection mySyncConnection;
     @Mock
     Closeable closeable;
     @Mock
     ThreadFactory threadFactory;
     @Mock
-    Thread thread;
-    private ArrayList<MyConnectionEventListener> listeners;
+    Thread openerThread;
+    @Mock
+    Thread receiverThread;
     private final MyDriverFactory myDriverFactory = new MyDriverFactory();
     private final CommonUtility commonUtility = new CommonUtility();
     private Map<Integer, MySubscriber> mySubscriberMap;
+    @Mock
+    MyConnectionOpenerFactory myConnectionOpenerFactory;
+    @Mock
+    MyConnectionOpener myConnectionOpener;
+    @Mock
+    MyConnectionReceiverFactory myConnectionReceiverFactory;
+    @Mock
+    MyRunnableFactory myRunnableFactory;
+    @Mock
+    MyRunnable openerRunner;
+    @Mock
+    MyRunnable receiverRunner;
+    @Mock
+    MyConnectionReceiver myConnectionReceiver;
 
     @Before
     public void setUp() throws Exception {
         uris = new String[]{"a", "b"};
-        listeners = new ArrayList<MyConnectionEventListener>();
-        when(myConnectionFactory.newMyConnection(uris, myDriverFactory, MyConnection.RECONNECT_INTERVAL, commonUtility, listeners)).thenReturn(myConnectionInterface);
-        when(myConnectionInterface.subscribe(queryId, mySubscriber)).thenReturn(closeable);
-
         mySubscriberMap = new HashMap<Integer, MySubscriber>();
-        myConnection = new MyConnection(uris, myConnectionFactory, mySubscriberMap, threadFactory, new ArrayList<MyConnectionEventListener>(), myDriverFactory, commonUtility);
 
-        when(threadFactory.newThread(myConnection)).thenReturn(thread);
+        when(mySyncConnectionFactory.newMySyncConnection(uris, myDriverFactory, mySubscriberMap)).thenReturn(mySyncConnection);
+        when(mySyncConnection.subscribe(queryId, mySubscriber)).thenReturn(closeable);
+        when(myConnectionOpenerFactory.newMyConnectionOpener(mySyncConnection, commonUtility, MyConnection.RECONNECT_INTERVAL, mySubscriberMap)).thenReturn(myConnectionOpener);
+        when(myConnectionReceiverFactory.newMyConnectionReceiver(mySyncConnection)).thenReturn(myConnectionReceiver);
+        when(myRunnableFactory.newMyRunnable(myConnectionOpener)).thenReturn(openerRunner);
+        when(myRunnableFactory.newMyRunnable(myConnectionReceiver)).thenReturn(receiverRunner);
+
+
+        myConnection = new MyConnection(uris, mySyncConnectionFactory, mySubscriberMap, threadFactory, myDriverFactory, commonUtility, myConnectionOpenerFactory, myConnectionReceiverFactory, myRunnableFactory);
+
+        when(threadFactory.newThread(openerRunner)).thenReturn(openerThread);
+        when(threadFactory.newThread(receiverRunner)).thenReturn(receiverThread);
         queryId = 123;
     }
 
     @Test
     public void testNew() throws Exception {
-        verify(myConnectionFactory).newMyConnection(uris, myDriverFactory, MyConnection.RECONNECT_INTERVAL, commonUtility, listeners);
+        verify(mySyncConnectionFactory).newMySyncConnection(uris, myDriverFactory, mySubscriberMap);
+        verify(myConnectionOpenerFactory).newMyConnectionOpener(mySyncConnection, commonUtility, MyConnection.RECONNECT_INTERVAL, mySubscriberMap);
+        verify(myConnectionReceiverFactory).newMyConnectionReceiver(mySyncConnection);
+        verify(myRunnableFactory).newMyRunnable(myConnectionOpener);
+        verify(myRunnableFactory).newMyRunnable(myConnectionReceiver);
     }
 
     @Test
     public void testOpen() throws Exception {
         myConnection.open();
 
-        verify(threadFactory).newThread(myConnection);
-        verify(thread).start();
-        assertThat(myConnection.isOpened(),is(true));
+        verify(threadFactory).newThread(openerRunner);
+        verify(threadFactory).newThread(receiverRunner);
+        verify(openerThread).start();
+        verify(receiverThread).start();
+        verify(myConnectionOpener).setOpened(true);
+        verify(myConnectionReceiver).setOpened(true);
     }
 
     @Test
     public void testSubscribe() throws Exception {
         Closeable closeable = myConnection.subscribe(queryId, mySubscriber);
 
-        assertThat(mySubscriberMap.size(), is(1));
-        assertThat(mySubscriberMap.get(queryId), is(mySubscriber));
-        assertThat(closeable, is(closeable));
+        verify(myConnectionOpener).addSubscribe(queryId, mySubscriber);
 
         closeable.close();
 
-        assertThat(mySubscriberMap.isEmpty(), is(true));
+        verify(myConnectionOpener).removeSubscribe(queryId);
     }
 
     /**
@@ -91,7 +114,8 @@ public class MyConnectionTest {
     @Test
     public void testClose() throws Exception {
         myConnection.close();
-        
-        assertThat(myConnection.isOpened(),is(false));
+
+        verify(myConnectionOpener).setOpened(false);
+        verify(myConnectionReceiver).setOpened(false);
     }
 }

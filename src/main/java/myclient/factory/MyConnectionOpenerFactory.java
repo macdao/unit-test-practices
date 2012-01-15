@@ -1,12 +1,14 @@
 package myclient.factory;
 
-import myclient.MyConnectionEventListener;
+import myclient.CommonUtility;
 import myclient.MyConnectionOpener;
+import myclient.MySubscriber;
+import myclient.MySyncConnection;
 
-import java.util.List;
+import java.util.Map;
 
 public class MyConnectionOpenerFactory {
-    public MyConnectionOpener newMyConnectionOpener(String[] uris, int reconnectInterval, List<MyConnectionEventListener> listeners) {
-        return new MyConnectionOpener(uris, reconnectInterval, listeners);
+    public MyConnectionOpener newMyConnectionOpener(MySyncConnection mySyncConnection, CommonUtility commonUtility, int reconnectInterval, Map<Integer, MySubscriber> effectedSubscriberMap) {
+        return new MyConnectionOpener(mySyncConnection, commonUtility, reconnectInterval, effectedSubscriberMap);
     }
 }
