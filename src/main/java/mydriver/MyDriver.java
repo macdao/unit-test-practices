@@ -24,7 +24,7 @@ public final class MyDriver {
             }
             
         }).start();
-        rate = 0.01;
+        rate = 0.5;
     }
     
     public void connect() throws MyDriverException {

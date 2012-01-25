@@ -2,8 +2,6 @@ package myclient;
 
 import com.google.common.collect.ImmutableMap;
 import mydriver.MyDriverException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,11 +9,10 @@ import java.util.Map;
 public class MyConnectionOpener implements MyOneLoop {
     private final MySyncConnection mySyncConnection;
     private boolean opened;
-    private CommonUtility commonUtility;
-    private int reconnectInterval;
+    private final CommonUtility commonUtility;
+    private final int reconnectInterval;
     private final Map<Integer, MySubscriber> mySubscriberMap = new HashMap<Integer, MySubscriber>();
     private final Map<Integer, MySubscriber> effectedSubscriberMap;
-    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     public MyConnectionOpener(MySyncConnection mySyncConnection, CommonUtility commonUtility, int reconnectInterval, Map<Integer, MySubscriber> effectedSubscriberMap) {
         this.mySyncConnection = mySyncConnection;
@@ -37,19 +34,13 @@ public class MyConnectionOpener implements MyOneLoop {
             return true;
         }
 
-        if (mySubscriberMap.size() != effectedSubscriberMap.size()) {
-            logger.info("{}-{}", mySubscriberMap, effectedSubscriberMap);
-        }
-
         final Map<Integer, MySubscriber> subscriberMap = ImmutableMap.copyOf(mySubscriberMap);
         final Map<Integer, MySubscriber> effectedMap = ImmutableMap.copyOf(effectedSubscriberMap);
         for (Map.Entry<Integer, MySubscriber> entry : subscriberMap.entrySet()) {
             if (!effectedMap.containsKey(entry.getKey())) {
                 try {
-                    logger.info("Subscribe {}", entry.getKey());
                     mySyncConnection.subscribe(entry.getKey(), entry.getValue());
                 } catch (MyDriverException e) {
-                    logger.warn("Subscribe failed:{}", entry.getKey());
                     return true;
                 }
             }
@@ -59,10 +50,8 @@ public class MyConnectionOpener implements MyOneLoop {
         for (Map.Entry<Integer, MySubscriber> entry : effectedMap.entrySet()) {
             if (!subscriberMap.containsKey(entry.getKey())) {
                 try {
-                    logger.info("Cancel subscribe {}", entry.getKey());
                     mySyncConnection.cancelSubscribe(entry.getKey());
                 } catch (MyDriverException e) {
-                    logger.warn("Cancel subscribe failed:{}", entry.getKey());
                     return true;
                 }
             }

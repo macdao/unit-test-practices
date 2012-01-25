@@ -26,7 +26,7 @@ public class MyConnectionOpenerTest {
     private int reconnectInterval;
     @Mock
     MySubscriber mySubscriber;
-    private int queryId = 123;
+    private final int queryId = 123;
     private Map<Integer, MySubscriber> effectedMySubscriberMap;
 
     @Before

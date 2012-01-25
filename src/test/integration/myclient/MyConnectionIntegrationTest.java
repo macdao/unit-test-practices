@@ -50,9 +50,9 @@ public class MyConnectionIntegrationTest {
             }
         });
 
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         closeable.close();
-        Thread.sleep(5000);
+        Thread.sleep(2000);
 
         connection.close();
 

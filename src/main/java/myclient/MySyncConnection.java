@@ -4,8 +4,6 @@ import com.google.common.collect.Lists;
 import myclient.factory.MyDriverFactory;
 import mydriver.MyData;
 import mydriver.MyDriverException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -18,9 +16,8 @@ public class MySyncConnection implements MyConnectionInterface, MyConnectionEven
     private final MyDriverFactory myDriverFactory;
     private final List<MyConnectionEventListener> listeners;
     private final Map<Integer, MySubscriber> mySubscriberMap;
-    private MyDriverAdapter myDriverAdapter;
+    private volatile MyDriverAdapter myDriverAdapter;
     private int urisIndex;
-    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     public MySyncConnection(String[] uris, MyDriverFactory myDriverFactory, Map<Integer, MySubscriber> mySubscriberMap) {
         this.uris = uris;
@@ -121,7 +118,6 @@ public class MySyncConnection implements MyConnectionInterface, MyConnectionEven
         final MyData myData;
         try {
             myData = driver.receive();
-            logger.info("Received {}", myData);
         } catch (MyDriverException e) {
             handleTransferException(driver);
             throw e;
