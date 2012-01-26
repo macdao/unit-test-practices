@@ -4,8 +4,8 @@ import myclient.factory.*;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
@@ -23,7 +23,7 @@ public class MyConnection implements MyConnectionInterface {
     private final MyRunnable receiverRunner;
 
     public MyConnection(String[] uris) {
-        this(uris, new MySyncConnectionFactory(), new HashMap<Integer, MySubscriber>(), Executors.defaultThreadFactory(), new MyDriverFactory(), new CommonUtility(), new MyConnectionOpenerFactory(), new MyConnectionReceiverFactory(), new MyRunnableFactory());
+        this(uris, new MySyncConnectionFactory(), new ConcurrentHashMap<Integer, MySubscriber>(), Executors.defaultThreadFactory(), new MyDriverFactory(), new CommonUtility(), new MyConnectionOpenerFactory(), new MyConnectionReceiverFactory(), new MyRunnableFactory());
     }
 
     public MyConnection(String[] uris, MySyncConnectionFactory mySyncConnectionFactory, Map<Integer, MySubscriber> mySubscriberMap, ThreadFactory threadFactory, MyDriverFactory myDriverFactory, CommonUtility commonUtility, MyConnectionOpenerFactory myConnectionOpenerFactory, MyConnectionReceiverFactory myConnectionReceiverFactory, MyRunnableFactory myRunnableFactory) {

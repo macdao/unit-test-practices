@@ -1,17 +1,16 @@
 package myclient;
 
-import com.google.common.collect.ImmutableMap;
 import mydriver.MyDriverException;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MyConnectionOpener implements MyOneLoop {
     private final MySyncConnection mySyncConnection;
-    private boolean opened;
+    private volatile boolean opened;
     private final CommonUtility commonUtility;
     private final int reconnectInterval;
-    private final Map<Integer, MySubscriber> mySubscriberMap = new HashMap<Integer, MySubscriber>();
+    private final Map<Integer, MySubscriber> mySubscriberMap = new ConcurrentHashMap<Integer, MySubscriber>();
     private final Map<Integer, MySubscriber> effectedSubscriberMap;
 
     public MyConnectionOpener(MySyncConnection mySyncConnection, CommonUtility commonUtility, int reconnectInterval, Map<Integer, MySubscriber> effectedSubscriberMap) {
@@ -34,10 +33,8 @@ public class MyConnectionOpener implements MyOneLoop {
             return true;
         }
 
-        final Map<Integer, MySubscriber> subscriberMap = ImmutableMap.copyOf(mySubscriberMap);
-        final Map<Integer, MySubscriber> effectedMap = ImmutableMap.copyOf(effectedSubscriberMap);
-        for (Map.Entry<Integer, MySubscriber> entry : subscriberMap.entrySet()) {
-            if (!effectedMap.containsKey(entry.getKey())) {
+        for (Map.Entry<Integer, MySubscriber> entry : mySubscriberMap.entrySet()) {
+            if (!effectedSubscriberMap.containsKey(entry.getKey())) {
                 try {
                     mySyncConnection.subscribe(entry.getKey(), entry.getValue());
                 } catch (MyDriverException e) {
@@ -47,8 +44,8 @@ public class MyConnectionOpener implements MyOneLoop {
         }
 
 
-        for (Map.Entry<Integer, MySubscriber> entry : effectedMap.entrySet()) {
-            if (!subscriberMap.containsKey(entry.getKey())) {
+        for (Map.Entry<Integer, MySubscriber> entry : effectedSubscriberMap.entrySet()) {
+            if (!mySubscriberMap.containsKey(entry.getKey())) {
                 try {
                     mySyncConnection.cancelSubscribe(entry.getKey());
                 } catch (MyDriverException e) {

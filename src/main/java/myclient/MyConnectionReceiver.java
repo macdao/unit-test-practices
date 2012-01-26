@@ -4,7 +4,7 @@ import mydriver.MyDriverException;
 
 public class MyConnectionReceiver implements MyOneLoop {
     private final MySyncConnection mySyncConnection;
-    private boolean opened;
+    private volatile boolean opened;
 
     public MyConnectionReceiver(MySyncConnection mySyncConnection) {
         this.mySyncConnection = mySyncConnection;
